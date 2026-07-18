@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Finanzas — Tracker Personal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#0B0F14; --surface:#141A22; --surface2:#1B232E; --surface3:#232E3D;
@@ -208,17 +209,17 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
     </div>
     <div class="card">
       <div id="loginForm">
-        <div class="field"><label>Usuario</label><input type="text" id="loginUser" placeholder="tu usuario"></div>
-        <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
-        <button class="btn" onclick="doLogin()">Entrar</button>
+        <div class="field"><label>Correo electrónico</label><input type="email" id="loginUser" placeholder="tu@correo.com" autocomplete="email"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+        <button class="btn" id="loginBtn" onclick="doLogin()">Entrar</button>
         <div class="auth-err" id="loginErr"></div>
         <div class="link-row">¿Primera vez? <a onclick="showRegister()">Crear cuenta</a></div>
-        <div class="demo-hint">Cuenta de prueba: <b>demo</b> / <b>demo123</b> (con datos de ejemplo)</div>
       </div>
       <div id="registerForm" class="hidden">
-        <div class="field"><label>Usuario</label><input type="text" id="regUser" placeholder="elige un usuario"></div>
-        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="mínimo 4 caracteres"></div>
-        <button class="btn" onclick="doRegister()">Crear cuenta</button>
+        <div class="field"><label>Nombre</label><input type="text" id="regName" placeholder="¿cómo te llamamos?" autocomplete="name"></div>
+        <div class="field"><label>Correo electrónico</label><input type="email" id="regUser" placeholder="tu@correo.com" autocomplete="email"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="mínimo 6 caracteres" autocomplete="new-password"></div>
+        <button class="btn" id="regBtn" onclick="doRegister()">Crear cuenta</button>
         <div class="auth-err" id="regErr"></div>
         <div class="link-row">¿Ya tienes cuenta? <a onclick="showLogin()">Entrar</a></div>
       </div>
@@ -373,8 +374,12 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
 <div class="toast" id="toast"></div>
 
 <script>
+/* ======================= SUPABASE CLIENT ======================= */
+const SUPABASE_URL = 'https://raontltjqxxssklbclzz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ACmAKLv8NuOKSa3jykEIFg_VV1fDpG-';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 /* ======================= DATA LAYER ======================= */
-const STORE_KEY = 'ftx_users_v1';
 let currentUser = null, userData = null, activeTab = 'home', activeTxType = 'expense', activeYear = new Date().getFullYear();
 let annualMode = 'buckets';
 let pendingDepositGoalId = null;
@@ -540,54 +545,60 @@ function drawLineChart(containerId, labels, datasets, opts){
   container.appendChild(wrap);
 }
 
-function loadStore(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }catch(e){ return {}; } }
-function saveStore(store){ localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
 function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[] }; }
+const DEFAULT_BUDGET = [
+  {name:'Necesidades', pct:50, color:'#3B82F6'},{name:'Deseos', pct:20, color:'#F5A623'},
+  {name:'Ahorros', pct:15, color:'#8B7FF5'},{name:'Inversiones', pct:15, color:'#22B8CF'}
+];
 
-function ensureDemoAccount(){
-  const store = loadStore();
-  const needsReseed = !store['demo'] || (store['demo'].data.seedVersion||0) < 3;
-  if (needsReseed){
-    store['demo'] = { password:'demo123', data: seedDemoData() };
-    saveStore(store);
-  }
+/* ---- row <-> app-object mappers (DB uses snake_case, app uses camelCase) ---- */
+function txFromRow(r){ return { id:r.id, date:r.date, type:r.type, amount:Number(r.amount), category:r.category, deducible:!!r.deducible, paymentMethod:r.payment_method, cardId:r.card_id, note:r.note||'', recurId:r.recur_id }; }
+function txToRow(t){ return { date:t.date, type:t.type, amount:t.amount, category:t.category, deducible:!!t.deducible, payment_method:t.paymentMethod, card_id:t.cardId||null, note:t.note||'', recur_id:t.recurId||null }; }
+function recurFromRow(r){ return { id:r.id, name:r.name, amount:Number(r.amount), freq:r.freq, day:r.day, category:r.category, type:r.type, cancelled:!!r.cancelled }; }
+function recurToRow(r){ return { name:r.name, amount:r.amount, freq:r.freq, day:r.day, category:r.category, type:r.type, cancelled:!!r.cancelled }; }
+function goalFromRow(r){ return { id:r.id, name:r.name, emoji:r.emoji, target:Number(r.target), done:!!r.done, deposits:[] }; }
+function depFromRow(r){ return { id:r.id, goalId:r.goal_id, date:r.date, amount:Number(r.amount) }; }
+function cardFromRow(r){ return { id:r.id, name:r.name }; }
+
+/* ---- generic CRUD wrappers around Supabase, with a friendly toast on failure ---- */
+async function dbInsert(table, row){
+  const { data, error } = await sb.from(table).insert(row).select().single();
+  if (error){ showToast('No se pudo guardar: '+error.message); throw error; }
+  return data;
+}
+async function dbUpdate(table, id, patch){
+  const { error } = await sb.from(table).update(patch).eq('id', id);
+  if (error){ showToast('No se pudo actualizar: '+error.message); throw error; }
+}
+async function dbDelete(table, id){
+  const { error } = await sb.from(table).delete().eq('id', id);
+  if (error){ showToast('No se pudo eliminar: '+error.message); throw error; }
 }
 
-function seedDemoData(){
+/* ---- load everything for the signed-in user in parallel ---- */
+async function loadAllUserData(){
+  const [txQ, recQ, snQ, goalQ, depQ, cardQ, setQ] = await Promise.all([
+    sb.from('transactions').select('*'),
+    sb.from('recurring_items').select('*'),
+    sb.from('recur_snoozed').select('*'),
+    sb.from('goals').select('*'),
+    sb.from('goal_deposits').select('*'),
+    sb.from('cards').select('*'),
+    sb.from('user_settings').select('*').maybeSingle()
+  ]);
   const data = blankData();
-  data.seedVersion = 3;
-  data.cards = [{id:'c1', name:'BAC Visa Signature'},{id:'c2', name:'Banistmo Mastercard'}];
-  data.budget = [
-    {name:'Necesidades', pct:50, color:'#3B82F6'},
-    {name:'Deseos', pct:20, color:'#F5A623'},
-    {name:'Ahorros', pct:15, color:'#8B7FF5'},
-    {name:'Inversiones', pct:15, color:'#22B8CF'}
-  ];
-  data.recurringItems = [
-    {id:'r1', name:'Alquiler', amount:950, day:1, freq:'mensual', type:'expense', category:'Vivienda', cancelled:false},
-    {id:'r2', name:'Internet', amount:65, day:5, freq:'mensual', type:'expense', category:'Vivienda', cancelled:false},
-    {id:'r3', name:'Seguro médico', amount:180, day:10, freq:'mensual', type:'expense', category:'Salud y familia', cancelled:false},
-    {id:'r4', name:'Salario', amount:1425, freq:'quincenal', type:'income', category:'Salario', cancelled:false}
-  ];
-  data.goals = [
-    {id:'g1', name:'Viaje a Cartagena', emoji:'✈️', target:1500, deposits:[{date:'2026-02-10',amount:200},{date:'2026-03-12',amount:250},{date:'2026-05-02',amount:300}], done:false},
-    {id:'g2', name:'Cancelar deuda tarjeta BAC', emoji:'💳', target:800, deposits:[{date:'2026-01-20',amount:400},{date:'2026-03-15',amount:400}], done:true}
-  ];
-  let id = 1;
-  const yr = new Date().getFullYear();
-  [1,2,3,4,5,6].forEach(m=>{
-    const mm = String(m).padStart(2,'0');
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-01`, type:'income', amount:2850, category:'Salario', deducible:false, paymentMethod:'Transferencia', cardId:null, note:'Salario mensual', recurId:null});
-    if (m % 2 === 0) data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-15`, type:'income', amount:420, category:'Freelance / Consultoría', deducible:false, paymentMethod:'Transferencia', cardId:null, note:'Proyecto consultoría', recurId:null});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-01`, type:'expense', amount:950, category:'Alquiler / hipoteca', deducible:false, paymentMethod:'Transferencia', cardId:null, note:'Alquiler', recurId:'r1'});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-05`, type:'expense', amount:65, category:'Internet', deducible:false, paymentMethod:'Débito', cardId:null, note:'', recurId:'r2'});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-10`, type:'expense', amount:180, category:'Primas de seguro médico', deducible:true, paymentMethod:'Débito', cardId:null, note:'', recurId:'r3'});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-08`, type:'expense', amount:310+m*4, category:'Supermercado', deducible:false, paymentMethod:'Tarjeta de crédito', cardId:'c1', note:'', recurId:null});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-14`, type:'expense', amount:85, category:'Transporte y gasolina', deducible:false, paymentMethod:'Tarjeta de crédito', cardId:'c1', note:'', recurId:null});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-18`, type:'expense', amount:62, category:'Gastos de representación / networking (comidas de negocio)', deducible:true, paymentMethod:'Tarjeta de crédito', cardId:'c2', note:'Almuerzo con socio', recurId:null});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-20`, type:'expense', amount:45+m*8, category:'Entretenimiento', deducible:false, paymentMethod:'Tarjeta de crédito', cardId:'c2', note:'', recurId:null});
-    data.transactions.push({id:'t'+(id++), date:`${yr}-${mm}-22`, type:'expense', amount:120, category:'Ropa y cuidado personal', deducible:false, paymentMethod:'Tarjeta de crédito', cardId:'c1', note:'', recurId:null});
+  data.transactions = (txQ.data||[]).map(txFromRow);
+  data.recurringItems = (recQ.data||[]).map(recurFromRow);
+  const snoozed = {};
+  (snQ.data||[]).forEach(s=>{ snoozed[s.recur_id] = s.until_date; });
+  data.snoozed = snoozed;
+  data.goals = (goalQ.data||[]).map(goalFromRow);
+  (depQ.data||[]).forEach(d=>{
+    const g = data.goals.find(g=>g.id===d.goal_id);
+    if (g) g.deposits.push(depFromRow(d));
   });
+  data.cards = (cardQ.data||[]).map(cardFromRow);
+  data.budget = (setQ.data && setQ.data.budget && setQ.data.budget.length) ? setQ.data.budget : DEFAULT_BUDGET;
   return data;
 }
 
@@ -595,37 +606,74 @@ function seedDemoData(){
 function showRegister(){ document.getElementById('loginForm').classList.add('hidden'); document.getElementById('registerForm').classList.remove('hidden'); }
 function showLogin(){ document.getElementById('registerForm').classList.add('hidden'); document.getElementById('loginForm').classList.remove('hidden'); }
 
-function doLogin(){
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value;
-  const store = loadStore();
+function translateAuthError(msg){
+  msg = msg || '';
+  if (/invalid login credentials/i.test(msg)) return 'Correo o contraseña incorrectos';
+  if (/already registered|already exists|user_already_exists/i.test(msg)) return 'Ese correo ya tiene una cuenta — intenta entrar en vez de crear una nueva';
+  if (/password.*(6|least)/i.test(msg)) return 'La contraseña debe tener al menos 6 caracteres';
+  if (/rate limit/i.test(msg)) return 'Demasiados intentos — espera un minuto e intenta de nuevo';
+  if (/network|fetch/i.test(msg)) return 'No hay conexión a internet — esta app necesita internet para funcionar';
+  return msg;
+}
+function displayName(user){
+  return (user.user_metadata && user.user_metadata.display_name) || (user.email||'').split('@')[0];
+}
+
+async function doLogin(){
+  const email = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
   const errEl = document.getElementById('loginErr');
-  if (!store[u] || store[u].password !== p){ errEl.textContent = 'Usuario o contraseña incorrectos'; return; }
   errEl.textContent = '';
-  currentUser = u; userData = store[u].data;
-  userData.goals = userData.goals || [];
-  enterApp();
+  if (!email || !pass){ errEl.textContent = 'Completa correo y contraseña'; return; }
+  const btn = document.getElementById('loginBtn'); btn.textContent = 'Entrando…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.textContent = 'Entrar';
+  if (error){ errEl.textContent = translateAuthError(error.message); return; }
+  await afterAuthSuccess(data.user);
 }
-function doRegister(){
-  const u = document.getElementById('regUser').value.trim();
-  const p = document.getElementById('regPass').value;
+async function doRegister(){
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regUser').value.trim();
+  const pass = document.getElementById('regPass').value;
   const errEl = document.getElementById('regErr');
-  if (!u || p.length < 4){ errEl.textContent = 'Usuario requerido y contraseña de mínimo 4 caracteres'; return; }
-  const store = loadStore();
-  if (store[u]){ errEl.textContent = 'Ese usuario ya existe'; return; }
-  store[u] = { password:p, data: blankData() };
-  saveStore(store);
+  errEl.style.color = 'var(--red)';
   errEl.textContent = '';
-  currentUser = u; userData = store[u].data;
+  if (!name || !email || pass.length < 6){ errEl.textContent = 'Completa nombre, correo y una contraseña de mínimo 6 caracteres'; return; }
+  const btn = document.getElementById('regBtn'); btn.textContent = 'Creando cuenta…';
+  const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ display_name:name } } });
+  btn.textContent = 'Crear cuenta';
+  if (error){ errEl.textContent = translateAuthError(error.message); return; }
+  if (!data.session){
+    errEl.style.color = 'var(--accent)';
+    errEl.textContent = '✅ Cuenta creada. Revisa tu correo para confirmarla antes de entrar.';
+    return;
+  }
+  await afterAuthSuccess(data.user);
+}
+async function afterAuthSuccess(user){
+  currentUser = user;
+  userData = await loadAllUserData();
   enterApp();
 }
-function logout(){ persist(); currentUser = null; userData = null; document.getElementById('app').style.display='none'; document.getElementById('authScreen').style.display='flex'; }
-function persist(){ if(!currentUser) return; const store = loadStore(); store[currentUser].data = userData; saveStore(store); }
+async function logout(){
+  await sb.auth.signOut();
+  currentUser = null; userData = null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('authScreen').style.display='flex';
+}
+async function tryResumeSession(){
+  const { data } = await sb.auth.getSession();
+  if (data && data.session && data.session.user){
+    currentUser = data.session.user;
+    userData = await loadAllUserData();
+    enterApp();
+  }
+}
 
 function enterApp(){
   document.getElementById('authScreen').style.display='none';
   document.getElementById('app').style.display='block';
-  document.getElementById('whoName').textContent = currentUser;
+  document.getElementById('whoName').textContent = displayName(currentUser);
   populateYearSelect();
   updateRecurBadge();
   goTab('home');
@@ -1066,14 +1114,17 @@ function goalCardHtml(g){
     </div>
   </div>`;
 }
-function saveGoal(){
+async function saveGoal(){
   const name = document.getElementById('goalName').value.trim();
   const target = parseFloat(document.getElementById('goalTarget').value);
   const emoji = document.getElementById('goalEmoji').value.trim();
   if (!name || !target){ showToast('Completa nombre y monto objetivo'); return; }
-  userData.goals = userData.goals || [];
-  userData.goals.push({ id:'g'+Date.now(), name, emoji, target, deposits:[], done:false });
-  persist(); closeModal('goalModalOverlay'); renderGoals(); showToast('Meta creada 🏆');
+  try{
+    const row = await dbInsert('goals', { name, emoji, target, done:false });
+    userData.goals = userData.goals || [];
+    userData.goals.push(goalFromRow(row));
+  }catch(e){ return; }
+  closeModal('goalModalOverlay'); renderGoals(); showToast('Meta creada 🏆');
   document.getElementById('goalName').value=''; document.getElementById('goalTarget').value=''; document.getElementById('goalEmoji').value='';
 }
 function openDeposit(id){
@@ -1083,15 +1134,18 @@ function openDeposit(id){
   document.getElementById('depositAmount').value = '';
   openModal('depositModalOverlay');
 }
-function confirmDeposit(){
+async function confirmDeposit(){
   const amount = parseFloat(document.getElementById('depositAmount').value);
   if (!amount || amount<=0){ showToast('Ingresa un monto válido'); return; }
   const g = userData.goals.find(x=>x.id===pendingDepositGoalId);
   if (!g) return;
-  const now = new Date();
-  g.deposits = g.deposits || [];
-  g.deposits.push({ date: now.toISOString().slice(0,10), amount });
-  persist(); closeModal('depositModalOverlay'); renderGoals();
+  const dateStr = new Date().toISOString().slice(0,10);
+  try{
+    const row = await dbInsert('goal_deposits', { goal_id:g.id, date:dateStr, amount });
+    g.deposits = g.deposits || [];
+    g.deposits.push(depFromRow(row));
+  }catch(e){ return; }
+  closeModal('depositModalOverlay'); renderGoals();
   const saved = g.deposits.reduce((a,d)=>a+d.amount,0);
   showToast(saved>=g.target ? '🎉 ¡Alcanzaste tu objetivo!' : '💪 Depósito registrado — vas por buen camino');
 }
@@ -1111,24 +1165,31 @@ async function confirmWithdraw(){
   if (amount > saved){ showToast('No puedes disminuir más de lo que has ahorrado ('+fmt(saved)+')'); return; }
   const ok = await askConfirm('¿Estás seguro que deseas disminuir '+fmt(amount)+' de tu meta "'+g.name+'"?', 'Sí, disminuir');
   if (!ok) return;
-  g.deposits.push({ date: new Date().toISOString().slice(0,10), amount: -amount });
-  persist(); closeModal('withdrawModalOverlay'); renderGoals();
+  const dateStr = new Date().toISOString().slice(0,10);
+  try{
+    const row = await dbInsert('goal_deposits', { goal_id:g.id, date:dateStr, amount:-amount });
+    g.deposits.push(depFromRow(row));
+  }catch(e){ return; }
+  closeModal('withdrawModalOverlay'); renderGoals();
   showToast('Retiro registrado — quedan '+fmt(saved-amount)+' en tu meta');
 }
-function toggleGoalDone(id){
+async function toggleGoalDone(id){
   const g = userData.goals.find(x=>x.id===id);
   if (!g) return;
   const saved = (g.deposits||[]).reduce((a,d)=>a+d.amount,0);
   if (!g.done && saved < g.target){ showToast('Aún no alcanzas el objetivo 💪'); return; }
-  g.done = !g.done;
-  persist(); renderGoals();
+  const newDone = !g.done;
+  try{ await dbUpdate('goals', id, { done:newDone }); }catch(e){ return; }
+  g.done = newDone;
+  renderGoals();
   if (g.done) showToast('🏅 ¡Meta cumplida! Felicidades');
 }
 async function deleteGoal(id){
   const ok = await askConfirm('¿Eliminar esta meta y sus depósitos?', 'Sí, eliminar');
   if (!ok) return;
+  try{ await dbDelete('goals', id); }catch(e){ return; }
   userData.goals = userData.goals.filter(g=>g.id!==id);
-  persist(); renderGoals(); showToast('Meta eliminada');
+  renderGoals(); showToast('Meta eliminada');
 }
 
 /* ======================= UPLOAD (FACTURA CON IA) ======================= */
@@ -1223,18 +1284,22 @@ function showReceiptVerify(parsed, allCats, appendMode){
   if (appendMode) stage.insertAdjacentHTML('beforeend', html);
   else stage.innerHTML = html;
 }
-function confirmReceipt(){
+async function confirmReceipt(){
   const amount = parseFloat(document.getElementById('rcTotal').value);
   const date = document.getElementById('rcDate').value;
   const category = document.getElementById('rcCategory').value;
   if (!amount || !date || !category){ showToast('Completa fecha, monto y categoría'); return; }
-  userData.transactions.push({
-    id:'t'+Date.now(), date, type:'expense', amount, category,
+  const tx = {
+    date, type:'expense', amount, category,
     deducible: document.getElementById('rcDeducible').checked,
     paymentMethod: document.getElementById('rcPayMethod').value,
     cardId:null, note: document.getElementById('rcMerchant').value.trim() + ' (factura)', recurId:null
-  });
-  persist(); populateYearSelect(); renderUpload(); updateRecurBadge();
+  };
+  try{
+    const row = await dbInsert('transactions', txToRow(tx));
+    userData.transactions.push(txFromRow(row));
+  }catch(e){ return; }
+  populateYearSelect(); renderUpload(); updateRecurBadge();
   showToast('✅ Factura registrada como gasto');
   pendingReceipt = null;
 }
@@ -1352,47 +1417,64 @@ function onRecurFreqChange(){
   const f = document.getElementById('recurFreq').value;
   document.getElementById('recurDayWrap').classList.toggle('hidden', f!=='mensual');
 }
-function payRecur(id){
+async function payRecur(id){
   const r = userData.recurringItems.find(x=>x.id===id);
   if (!r) return;
   const now = new Date();
   const date = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   const isIncome = (r.type||'expense')==='income';
-  userData.transactions.push({ id:'t'+Date.now(), date, type:isIncome?'income':'expense', amount:r.amount, category:isIncome?(r.category||r.name):r.name, deducible:false, paymentMethod:isIncome?'Transferencia':'Débito', cardId:null, note:isIncome?'Ingreso recurrente':'Pago recurrente', recurId:r.id });
-  persist(); renderRecur(); updateRecurBadge(); showToast(isIncome?'💵 Cobro registrado':'Pago registrado');
+  const tx = { date, type:isIncome?'income':'expense', amount:r.amount, category:isIncome?(r.category||r.name):r.name, deducible:false, paymentMethod:isIncome?'Transferencia':'Débito', cardId:null, note:isIncome?'Ingreso recurrente':'Pago recurrente', recurId:r.id };
+  try{
+    const row = await dbInsert('transactions', txToRow(tx));
+    userData.transactions.push(txFromRow(row));
+  }catch(e){ return; }
+  renderRecur(); updateRecurBadge(); showToast(isIncome?'💵 Cobro registrado':'Pago registrado');
 }
-function snoozeRecur(id){
+async function snoozeRecur(id){
   const now = new Date(); now.setDate(now.getDate()+1);
+  const untilDate = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const { error } = await sb.from('recur_snoozed').upsert({ recur_id:id, until_date:untilDate });
+  if (error){ showToast('No se pudo posponer: '+error.message); return; }
   userData.snoozed = userData.snoozed || {};
-  userData.snoozed[id] = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  persist(); renderRecur(); updateRecurBadge(); showToast('Pospuesto a mañana');
+  userData.snoozed[id] = untilDate;
+  renderRecur(); updateRecurBadge(); showToast('Pospuesto a mañana');
 }
 async function cancelRecur(id){
   const ok = await askConfirm('¿Omitir este pago recurrente por este mes?', 'Sí, omitir');
   if (!ok) return;
-  userData.snoozed = userData.snoozed || {};
   const now = new Date(); const nextMonth = new Date(now.getFullYear(), now.getMonth()+1, 1);
-  userData.snoozed[id] = nextMonth.getFullYear()+'-'+String(nextMonth.getMonth()+1).padStart(2,'0')+'-01';
-  persist(); renderRecur(); updateRecurBadge(); showToast('Omitido este mes');
+  const untilDate = nextMonth.getFullYear()+'-'+String(nextMonth.getMonth()+1).padStart(2,'0')+'-01';
+  const { error } = await sb.from('recur_snoozed').upsert({ recur_id:id, until_date:untilDate });
+  if (error){ showToast('No se pudo omitir: '+error.message); return; }
+  userData.snoozed = userData.snoozed || {};
+  userData.snoozed[id] = untilDate;
+  renderRecur(); updateRecurBadge(); showToast('Omitido este mes');
 }
-function saveRecur(){
+async function saveRecur(){
   const name = document.getElementById('recurName').value.trim();
   const amount = parseFloat(document.getElementById('recurAmount').value);
   const freq = document.getElementById('recurFreq').value;
   const day = parseInt(document.getElementById('recurDay').value) || 1;
   const category = document.getElementById('recurCategory').value.trim() || (activeRecurType==='income'?'Salario':'General');
   if (!name || !amount){ showToast('Completa nombre y monto'); return; }
-  userData.recurringItems = userData.recurringItems || [];
-  userData.recurringItems.push({ id:'r'+Date.now(), name, amount, freq, day, category, type:activeRecurType, cancelled:false });
-  persist(); closeModal('recurModalOverlay'); renderRecur(); updateRecurBadge(); showToast(activeRecurType==='income'?'Ingreso recurrente agregado 💵':'Gasto recurrente agregado');
+  const item = { name, amount, freq, day, category, type:activeRecurType, cancelled:false };
+  try{
+    const row = await dbInsert('recurring_items', recurToRow(item));
+    userData.recurringItems = userData.recurringItems || [];
+    userData.recurringItems.push(recurFromRow(row));
+  }catch(e){ return; }
+  closeModal('recurModalOverlay'); renderRecur(); updateRecurBadge(); showToast(activeRecurType==='income'?'Ingreso recurrente agregado 💵':'Gasto recurrente agregado');
   document.getElementById('recurName').value=''; document.getElementById('recurAmount').value=''; document.getElementById('recurCategory').value='';
 }
-function saveCard(){
+async function saveCard(){
   const name = document.getElementById('cardName').value.trim();
   if (!name){ showToast('Ingresa un nombre'); return; }
-  userData.cards = userData.cards || [];
-  userData.cards.push({ id:'c'+Date.now(), name });
-  persist(); closeModal('cardModalOverlay'); renderRecur(); showToast('Tarjeta agregada');
+  try{
+    const row = await dbInsert('cards', { name });
+    userData.cards = userData.cards || [];
+    userData.cards.push(cardFromRow(row));
+  }catch(e){ return; }
+  closeModal('cardModalOverlay'); renderRecur(); showToast('Tarjeta agregada');
   document.getElementById('cardName').value='';
 }
 
@@ -1426,7 +1508,11 @@ function onBudgetSlide(i, val){
   document.getElementById('bpct-'+i).textContent = val+'%';
   document.getElementById('budgetTotal').textContent = userData.budget.reduce((a,b)=>a+b.pct,0)+'%';
 }
-function saveBudget(){ persist(); showToast('Presupuesto guardado'); }
+async function saveBudget(){
+  const { error } = await sb.from('user_settings').update({ budget:userData.budget }).eq('user_id', currentUser.id);
+  if (error){ showToast('No se pudo guardar el presupuesto'); return; }
+  showToast('Presupuesto guardado');
+}
 
 /* ======================= RENTA (DGI Panamá) ======================= */
 function renderRenta(){
@@ -1511,9 +1597,10 @@ async function deleteEditingTx(){
   if (!editTxId) return;
   const ok = await askConfirm('¿Eliminar este movimiento? Esta acción no se puede deshacer.', 'Sí, eliminar');
   if (!ok) return;
+  try{ await dbDelete('transactions', editTxId); }catch(e){ return; }
   userData.transactions = userData.transactions.filter(t=>t.id!==editTxId);
   editTxId = null;
-  persist(); closeTxModal(); populateYearSelect(); renderActiveTab(); updateRecurBadge(); showToast('Movimiento eliminado');
+  closeTxModal(); populateYearSelect(); renderActiveTab(); updateRecurBadge(); showToast('Movimiento eliminado');
 }
 function closeTxModal(){ editTxId = null; closeModal('txModalOverlay'); }
 function setTxType(type){
@@ -1541,7 +1628,7 @@ function onPayMethodChange(){
     document.getElementById('txCard').innerHTML = (userData.cards||[]).map(c=>`<option value="${c.id}">${escHtml(c.name)}</option>`).join('') || '<option value="">Sin tarjetas — agrega una en Recurrentes</option>';
   }
 }
-function saveTx(){
+async function saveTx(){
   const amount = parseFloat(document.getElementById('txAmount').value);
   const date = document.getElementById('txDate').value;
   const category = document.getElementById('txCategory').value;
@@ -1552,13 +1639,19 @@ function saveTx(){
   if (!amount || !date || !category){ showToast('Completa monto, fecha y categoría'); return; }
   if (editTxId){
     const t = userData.transactions.find(x=>x.id===editTxId);
-    if (t){ Object.assign(t, { date, type:activeTxType, amount, category, deducible, paymentMethod:payMethod, cardId, note }); }
+    const patch = { date, type:activeTxType, amount, category, deducible, paymentMethod:payMethod, cardId, note };
+    try{ await dbUpdate('transactions', editTxId, txToRow(patch)); }catch(e){ return; }
+    if (t) Object.assign(t, patch);
     editTxId = null;
-    persist(); closeTxModal(); populateYearSelect(); renderActiveTab(); updateRecurBadge(); showToast('Movimiento actualizado ✏️');
+    closeTxModal(); populateYearSelect(); renderActiveTab(); updateRecurBadge(); showToast('Movimiento actualizado ✏️');
     return;
   }
-  userData.transactions.push({ id:'t'+Date.now(), date, type:activeTxType, amount, category, deducible, paymentMethod:payMethod, cardId, note, recurId:null });
-  persist(); closeTxModal(); populateYearSelect(); destroyCharts(); renderActiveTab(); updateRecurBadge(); showToast('Movimiento guardado');
+  const newTx = { date, type:activeTxType, amount, category, deducible, paymentMethod:payMethod, cardId, note, recurId:null };
+  try{
+    const row = await dbInsert('transactions', txToRow(newTx));
+    userData.transactions.push(txFromRow(row));
+  }catch(e){ return; }
+  closeTxModal(); populateYearSelect(); destroyCharts(); renderActiveTab(); updateRecurBadge(); showToast('Movimiento guardado');
 }
 
 /* ======================= MODAL HELPERS ======================= */
@@ -1585,7 +1678,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
   const txDate = document.getElementById('txDate');
   if (txDate) txDate.value = new Date().toISOString().slice(0,10);
-  ensureDemoAccount();
+  tryResumeSession();
 
   /* Prevent the classic "scroll over a focused number input silently changes its value"
      browser behavior, which was shaving cents off amounts during edits. */
