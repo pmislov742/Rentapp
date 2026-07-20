@@ -166,8 +166,8 @@ input[type=range]{ width:100%; accent-color:var(--accent); height:4px; }
 .empty-state .ic{ font-size:40px; margin-bottom:10px; }
 .empty-state .t{ font-size:14px; }
 
-.chart-wrap{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px; position:relative; height:230px; }
-.chart-wrap.tall{ height:300px; }
+.chart-wrap{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px; position:relative; min-height:230px; }
+.chart-wrap.tall{ min-height:300px; }
 select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:700; }
 
 .toast{
@@ -257,14 +257,6 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
         <button class="btn" id="loginBtn" onclick="doLogin()">Entrar</button>
         <div class="auth-err" id="loginErr"></div>
         <div class="link-row">¿Primera vez? <a onclick="chooseFirstTime()">Crear cuenta</a></div>
-      </div>
-      <div id="registerForm" class="hidden">
-        <div class="field"><label>Nombre</label><input type="text" id="regName" placeholder="¿cómo te llamamos?" autocomplete="name"></div>
-        <div class="field"><label>Correo electrónico</label><input type="email" id="regUser" placeholder="tu@correo.com" autocomplete="email"></div>
-        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="mínimo 6 caracteres" autocomplete="new-password"></div>
-        <button class="btn" id="regBtn" onclick="doRegister()">Crear cuenta</button>
-        <div class="auth-err" id="regErr"></div>
-        <div class="link-row">¿Ya tienes cuenta? <a onclick="showLogin()">Entrar</a></div>
       </div>
     </div>
   </div>
@@ -576,7 +568,7 @@ function legendRow(items, opts){
     const item = document.createElement(tag);
     if (tag==='button'){ item.type='button'; }
     item.style.cssText = `display:flex;align-items:center;gap:5px;font-size:10.5px;padding:${opts.onToggle?'4px 9px':'0'};border-radius:20px;border:${opts.onToggle?'1px solid var(--border)':'none'};background:${opts.onToggle?(isOff?'transparent':'var(--surface2)'):'none'};color:${isOff?'var(--text3)':'var(--text2)'};opacity:${isOff?.5:1};${clickable?'cursor:pointer;':''}`;
-    item.innerHTML = `<span style="width:9px;height:9px;border-radius:3px;background:${it.color};display:inline-block;flex-shrink:0"></span>${escHtml(it.label)}`;
+    item.innerHTML = `<span style="width:9px;height:9px;border-radius:3px;flex-shrink:0;display:inline-block;${it.dashed ? `background:transparent;border:1.5px dashed ${it.color};` : `background:${it.color};`}"></span>${escHtml(it.label)}`;
     if (opts.onToggle) item.onclick = ()=>{ opts.visibility[it.label] = isOff; opts.onToggle(); };
     else if (opts.onItemClick) item.onclick = ()=> opts.onItemClick(it);
     legend.appendChild(item);
@@ -644,7 +636,7 @@ function drawGroupedBar(containerId, labels, datasets, opts){
       const bh = innerH*(val/maxVal);
       const bx = gx+barPad+di*barW;
       const by = padT+innerH-bh;
-      const rect = svgEl('rect', { x:bx, y:by, width:Math.max(barW-3,1), height:Math.max(bh,0), fill:d.color, rx:2 });
+      const rect = svgEl('rect', { x:bx, y:by, width:Math.max(barW-3,1), height:Math.max(bh,0), fill:d.color, rx: userData.chartStyle==='soft' ? 6 : 2 });
       if (d.onBarClick){ rect.style.cursor='pointer'; rect.addEventListener('click', ()=> d.onBarClick(gi, val)); }
       svg.appendChild(rect);
     });
@@ -685,7 +677,7 @@ function drawLineChart(containerId, labels, datasets, opts){
   visible.forEach(d=>{
     const pts = d.data.map((v,i)=>[ padL + innerW*(labels.length>1 ? i/(labels.length-1) : 0), padT + innerH - innerH*(v/maxVal) ]);
     const path = svgEl('path', { d: pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' '),
-      fill:'none', stroke:d.color, 'stroke-width': d.dashed?1.5:2 });
+      fill:'none', stroke:d.color, 'stroke-width': d.dashed?1.5:2, 'stroke-opacity': d.dashed?0.4:1 });
     if (d.dashed) path.setAttribute('stroke-dasharray','5,4');
     svg.appendChild(path);
     if (!d.dashed) pts.forEach((p,i)=>{
@@ -699,7 +691,7 @@ function drawLineChart(containerId, labels, datasets, opts){
   container.appendChild(wrap);
 }
 
-function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[], investments:[], debts:[], generalSavings:{deposits:[]}, checkins:[], onboarded:false, reminderOptIn:false, tier:'trial', trialEndsAt:null, accentColor:null, lastPaymentMethod:null, budgetCustomized:false, budgetPresetId:null, exploredTabs:{}, weeklyRecapWeeks:[], monthlyAiUses:0, premiumGiftGranted:false }; }
+function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[], investments:[], debts:[], generalSavings:{deposits:[]}, checkins:[], onboarded:false, reminderOptIn:false, tier:'trial', trialEndsAt:null, accentColor:null, chartStyle:'classic', lastPaymentMethod:null, budgetCustomized:false, budgetPresetId:null, exploredTabs:{}, weeklyRecapWeeks:[], monthlyAiUses:0, premiumGiftGranted:false }; }
 const DEFAULT_BUDGET = [
   {name:'Necesidades', pct:50, color:'#3B82F6'},{name:'Deseos', pct:20, color:'#F5A623'},
   {name:'Ahorros', pct:15, color:'#8B7FF5'},{name:'Inversiones', pct:15, color:'#22B8CF'},
@@ -714,12 +706,12 @@ function recurToRow(r){ return { name:r.name, amount:r.amount, freq:r.freq, day:
 function goalFromRow(r){ return { id:r.id, name:r.name, emoji:r.emoji, target:Number(r.target), done:!!r.done, deposits:[] }; }
 function depFromRow(r){ return { id:r.id, goalId:r.goal_id, date:r.date, amount:Number(r.amount) }; }
 function cardFromRow(r){ return { id:r.id, name:r.name, limit:r.credit_limit!=null?Number(r.credit_limit):null, balance:r.current_balance!=null?Number(r.current_balance):null, cutoffDay:r.cutoff_day||null, payDay:r.payment_day||null, interestRate:r.interest_rate!=null?Number(r.interest_rate):null }; }
+function cardDetailToRow(c){ return { credit_limit:c.limit, current_balance:c.balance, cutoff_day:c.cutoffDay, payment_day:c.payDay, interest_rate:c.interestRate }; }
 function investmentFromRow(r){ return { id:r.id, name:r.name, deposits:[] }; }
 function invDepFromRow(r){ return { id:r.id, investmentId:r.investment_id, date:r.date, amount:Number(r.amount), note:r.note||'' }; }
 function debtFromRow(r){ return { id:r.id, name:r.name, target:Number(r.target), done:!!r.done, payments:[] }; }
 function debtPayFromRow(r){ return { id:r.id, debtId:r.debt_id, date:r.date, amount:Number(r.amount) }; }
 function savingsDepFromRow(r){ return { id:r.id, date:r.date, amount:Number(r.amount) }; }
-function cardDetailToRow(c){ return { credit_limit:c.limit, current_balance:c.balance, cutoff_day:c.cutoffDay, payment_day:c.payDay, interest_rate:c.interestRate }; }
 
 /* ---- generic CRUD wrappers around Supabase, with a friendly toast on failure ---- */
 async function dbInsert(table, row){
@@ -783,6 +775,7 @@ async function loadAllUserData(){
   data.tier = (setQ.data && setQ.data.tier) || 'trial';
   data.trialEndsAt = setQ.data ? setQ.data.trial_ends_at : null;
   data.accentColor = setQ.data ? (setQ.data.accent_color || null) : null;
+  data.chartStyle = setQ.data ? (setQ.data.chart_style || 'classic') : 'classic';
   data.lastPaymentMethod = setQ.data ? (setQ.data.last_payment_method || null) : null;
   data.budgetCustomized = !!(setQ.data && setQ.data.budget_customized);
   data.budgetPresetId = setQ.data ? (setQ.data.budget_preset_id || null) : null;
@@ -824,8 +817,7 @@ function premiumLockedCard(featureName){
 }
 
 /* ======================= AUTH ======================= */
-function showRegister(){ document.getElementById('loginForm').classList.add('hidden'); document.getElementById('registerForm').classList.remove('hidden'); }
-function showLogin(){ document.getElementById('registerForm').classList.add('hidden'); document.getElementById('loginForm').classList.remove('hidden'); }
+function showLogin(){ document.getElementById('loginForm').classList.remove('hidden'); }
 
 function translateAuthError(msg){
   msg = msg || '';
@@ -850,25 +842,6 @@ async function doLogin(){
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
   btn.textContent = 'Entrar';
   if (error){ errEl.textContent = translateAuthError(error.message); return; }
-  await afterAuthSuccess(data.user);
-}
-async function doRegister(){
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regUser').value.trim();
-  const pass = document.getElementById('regPass').value;
-  const errEl = document.getElementById('regErr');
-  errEl.style.color = 'var(--red)';
-  errEl.textContent = '';
-  if (!name || !email || pass.length < 6){ errEl.textContent = 'Completa nombre, correo y una contraseña de mínimo 6 caracteres'; return; }
-  const btn = document.getElementById('regBtn'); btn.textContent = 'Creando cuenta…';
-  const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ display_name:name } } });
-  btn.textContent = 'Crear cuenta';
-  if (error){ errEl.textContent = translateAuthError(error.message); return; }
-  if (!data.session){
-    errEl.style.color = 'var(--accent)';
-    errEl.textContent = '✅ Cuenta creada. Revisa tu correo para confirmarla antes de entrar.';
-    return;
-  }
   await afterAuthSuccess(data.user);
 }
 async function afterAuthSuccess(user){
@@ -933,7 +906,7 @@ function goTab(tab){
   destroyCharts();
   renderActiveTab();
   userData.exploredTabs = userData.exploredTabs || {};
-  if (!userData.exploredTabs[tab]){ userData.exploredTabs[tab] = true; persistSetting({ explored_tabs: userData.exploredTabs }); maybeGrantUsageReward(); }
+  if (!userData.exploredTabs[tab]){ userData.exploredTabs[tab] = true; maybeGrantUsageReward(); }
 }
 function renderActiveTab(){
   if (activeTab==='home') renderHome();
@@ -1249,23 +1222,45 @@ function applyAccentColor(hex){
   document.documentElement.style.setProperty('--accent', hex);
   document.documentElement.style.setProperty('--accent-d', darkenHex(hex, 0.35));
 }
+const CHART_STYLES = [
+  { id:'classic', name:'Clásico', desc:'Barras rectas — el que usa toda la app hoy', recommended:true },
+  { id:'soft', name:'Suave', desc:'Barras redondeadas', recommended:false }
+];
 function openColorPicker(){
   const current = userData.accentColor || '#10B981';
+  const currentStyle = userData.chartStyle || 'classic';
   document.getElementById('recapModalBody').innerHTML = `
     <div style="text-align:center;margin-bottom:14px">
       <div style="font-size:30px">🎨</div>
       <div class="modal-title" style="margin-bottom:2px">Elige tu color</div>
       <div style="font-size:12px;color:var(--text3)">Lo puedes cambiar cuando quieras desde Más</div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
       ${ACCENT_PRESETS.map(p=>`
         <button class="btn" style="background:${p.hex};color:#04150F;flex-direction:column;height:60px;border:2px solid ${current===p.hex?'#fff':'transparent'}" onclick="chooseAccentColor('${p.hex}')">
           <div style="font-size:11px;font-weight:800">${p.name}${current===p.hex?' ✓':''}</div>
         </button>
       `).join('')}
     </div>
+    <div class="sec-title" style="margin-bottom:2px">Estilo de gráficas</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Solo cambia la forma de las barras — te recomendamos dejar el clásico.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${CHART_STYLES.map(s=>`
+        <button class="btn ${currentStyle===s.id?'':'secondary'}" style="flex-direction:column;align-items:flex-start;height:auto;padding:12px" onclick="chooseChartStyle('${s.id}')">
+          <div style="font-weight:800">${s.name}${s.recommended?' · recomendado':''}${currentStyle===s.id?' ✓':''}</div>
+          <div style="font-size:11px;font-weight:500;opacity:.8;margin-top:2px">${s.desc}</div>
+        </button>
+      `).join('')}
+    </div>
   `;
   openModal('recapModalOverlay');
+}
+function chooseChartStyle(id){
+  userData.chartStyle = id;
+  persistSetting({ chart_style: id });
+  openColorPicker();
+  showToast('Estilo de gráficas actualizado 📊');
+  renderActiveTab();
 }
 function chooseAccentColor(hex){
   userData.accentColor = hex;
@@ -1332,7 +1327,6 @@ function maybeGrantUsageReward(){
   const end = new Date(); end.setDate(end.getDate()+14);
   userData.trialEndsAt = end.toISOString();
   if (userData.tier !== 'premium') userData.tier = 'trial';
-  persistSetting({ premium_gift_granted:true, trial_ends_at:userData.trialEndsAt, tier:userData.tier });
   document.getElementById('recapModalBody').innerHTML = `
     <div style="text-align:center">
       <div style="font-size:40px">🎉</div>
@@ -1672,8 +1666,8 @@ function drawBudgetVsActual(containerId, budget, income, spent, m){
     const gx = padL+gi*groupW;
     const th = innerH*(targets[gi]/maxVal), ah = innerH*(actuals[gi]/maxVal);
     const onClick = b.name==='Sin asignar' ? ()=> openAllocateSurplus(actuals[gi]) : ()=> openBudgetBucketDetail(b.name, targets[gi], actuals[gi], m);
-    const targetRect = svgEl('rect', { x:gx+barPad, y:padT+innerH-th, width:Math.max(barW-3,1), height:Math.max(th,0), fill:b.color+'55', stroke:b.color, 'stroke-width':1.2, rx:2 });
-    const actualRect = svgEl('rect', { x:gx+barPad+barW, y:padT+innerH-ah, width:Math.max(barW-3,1), height:Math.max(ah,0), fill:b.color, rx:2 });
+    const targetRect = svgEl('rect', { x:gx+barPad, y:padT+innerH-th, width:Math.max(barW-3,1), height:Math.max(th,0), fill:b.color+'55', stroke:b.color, 'stroke-width':1.2, rx: userData.chartStyle==='soft' ? 6 : 2 });
+    const actualRect = svgEl('rect', { x:gx+barPad+barW, y:padT+innerH-ah, width:Math.max(barW-3,1), height:Math.max(ah,0), fill:b.color, rx: userData.chartStyle==='soft' ? 6 : 2 });
     targetRect.style.cursor = 'pointer'; targetRect.addEventListener('click', onClick);
     actualRect.style.cursor = 'pointer'; actualRect.addEventListener('click', onClick);
     svg.appendChild(targetRect);
@@ -1699,7 +1693,6 @@ async function runAiAnalysis(m){
   }
   if (!isPremiumActive()){
     userData.monthlyAiUses = (userData.monthlyAiUses||0) + 1;
-    persistSetting({ monthly_ai_uses: userData.monthlyAiUses });
     const btnWrap = document.getElementById('aiAnalysisWrap');
     if (btnWrap) btnWrap.querySelector('.btn.ai') && (btnWrap.querySelector('.btn.ai').textContent = `🪄 Ayúdame a corregir (${3-userData.monthlyAiUses} de 3 gratis)`);
   }
@@ -2928,7 +2921,7 @@ function onBudgetSlide(i, val){
   if (totalEl) totalEl.textContent = budget.reduce((a,b)=>a+b.pct,0)+'%';
 }
 async function saveBudget(){
-  const { error } = await sb.from('user_settings').update({ budget:userData.budget, budget_customized:true }).eq('user_id', currentUser.id);
+  const { error } = await sb.from('user_settings').update({ budget:userData.budget }).eq('user_id', currentUser.id);
   if (error){ showToast('No se pudo guardar el presupuesto'); return; }
   userData.budgetCustomized = true;
   maybeGrantUsageReward();
@@ -3043,14 +3036,9 @@ function renderMore(){
         <div class="more-info"><div class="more-name">Personalizar color</div></div>
         <div class="more-chev">›</div>
       </div>
-      <div class="more-item" onclick="openOnboarding()">
-        <div class="more-ic">❓</div>
-        <div class="more-info"><div class="more-name">Ver tutorial</div></div>
-        <div class="more-chev">›</div>
-      </div>
-      <div class="more-item" onclick="openPreAuthDemo()">
+      <div class="more-item" onclick="openReplayOnboarding()">
         <div class="more-ic">👋</div>
-        <div class="more-info"><div class="more-name">Bienvenida para nuevos usuarios</div><div class="more-sub">Vista previa del flujo — cierra sesión para probarlo real</div></div>
+        <div class="more-info"><div class="more-name">Repasar bienvenida y tutorial</div><div class="more-sub">Vuelve a verlo cuando quieras — tu cuenta no se toca</div></div>
         <div class="more-chev">›</div>
       </div>
       <div class="more-item" onclick="logout()">
@@ -3089,7 +3077,7 @@ function openWeeklyRecap(){
     openModal('recapModalOverlay');
     return;
   }
-  if (!alreadyCountedThisWeek){ userData.weeklyRecapWeeks.push({ year, week:wk }); persistSetting({ weekly_recap_weeks: userData.weeklyRecapWeeks }); }
+  if (!alreadyCountedThisWeek) userData.weeklyRecapWeeks.push({ year, week:wk });
   const grantedNow = !userData.premiumGiftGranted && usageStats().pct>=100;
   maybeGrantUsageReward();
   if (grantedNow) return;
@@ -3338,7 +3326,6 @@ async function saveTx(){
   const deducible = activeTxType==='expense' && document.getElementById('txDeducible').checked;
   if (!amount || !date || !category){ showToast('Completa monto, fecha y categoría'); return; }
   userData.lastPaymentMethod = payMethod;
-  persistSetting({ last_payment_method: payMethod });
   if (editTxId){
     const t = userData.transactions.find(x=>x.id===editTxId);
     const patch = { date, type:activeTxType, amount, category, deducible, paymentMethod:payMethod, cardId, note };
@@ -3511,15 +3498,14 @@ function renderOnbStep(){
   if (step.chart) requestAnimationFrame(()=> drawOnbChart(step.chart));
   if (step.interactive==='firsttx') onbSetTxType(onbTxType);
 }
-function onbPickColor(hex){ userData.accentColor = hex; applyAccentColor(hex); persistSetting({ accent_color: hex }); renderOnbStep(); }
-function onbPickPayMethod(m){ userData.lastPaymentMethod = m; persistSetting({ last_payment_method: m }); renderOnbStep(); }
+function onbPickColor(hex){ userData.accentColor = hex; applyAccentColor(hex); renderOnbStep(); }
+function onbPickPayMethod(m){ userData.lastPaymentMethod = m; renderOnbStep(); }
 function onbPickBudget(id){
   const preset = BUDGET_PRESETS.find(p=>p.id===id);
   if (!preset) return;
   userData.budget = preset.budget;
   userData.budgetPresetId = id;
   userData.budgetCustomized = true;
-  persistSetting({ budget: preset.budget, budget_preset_id: id, budget_customized: true });
   renderOnbStep();
 }
 let onbTxType = 'expense';
@@ -3637,12 +3623,14 @@ function chooseFirstTime(){
   openPreAuthDemo();
 }
 function openPreAuthDemo(){
+  window._replayMode = false;
   preAuthIndex = 0; preAuthAnswers = {};
   renderPreAuthStep();
   document.getElementById('preAuthOverlay').classList.add('show');
 }
 function closePreAuthDemo(){
   document.getElementById('preAuthOverlay').classList.remove('show');
+  window._replayMode = false;
   if (!currentUser){ document.getElementById('welcomeChoiceScreen').style.display = 'flex'; }
 }
 function suggestedBudgetFromAnswers(){
@@ -3668,10 +3656,14 @@ function helpBulletsFor(goal){
 }
 function renderPreAuthStep(){
   const body = document.getElementById('preAuthBody');
-  const totalSteps = 9;
+  const totalSteps = window._replayMode ? 8 : 9;
   let html = '';
   if (preAuthIndex===0){
-    html = `
+    html = window._replayMode ? `
+      <div class="onb-icon">👋</div>
+      <div class="onb-title">Repasemos juntos</div>
+      <div class="onb-desc">Las mismas 5 preguntas de antes, para refrescar tu presupuesto sugerido, y luego seguimos directo al tutorial. Puedes cerrar en cualquier momento sin perder nada de tu cuenta.</div>
+    ` : `
       <div class="onb-icon">👋</div>
       <div class="onb-title">¡Es tu primera vez en RENTAPP!</div>
       <div class="onb-desc">Antes de crear tu cuenta, queremos conocerte un poco — son solo 5 preguntas rápidas, y al final te damos una sugerencia de presupuesto hecha para ti.</div>
@@ -3694,7 +3686,7 @@ function renderPreAuthStep(){
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:360px;margin:14px 0">
         ${sugg.budget.map(b=>`<div class="metric"><div class="metric-label">${b.name}</div><div class="metric-value" style="color:${b.color};font-size:19px">${b.pct}%</div></div>`).join('')}
       </div>
-      <div class="onb-desc">Basado en tus respuestas, esto es un buen punto de partida. Lo vas a poder ajustar con calma justo después de crear tu cuenta.</div>
+      <div class="onb-desc">Basado en tus respuestas, esto es un buen punto de partida. Lo vas a poder ajustar con calma ${window._replayMode ? 'en el tutorial' : 'justo después de crear tu cuenta'}.</div>
     `;
   } else if (preAuthIndex===7){
     const bullets = helpBulletsFor(preAuthAnswers.goal);
@@ -3704,7 +3696,7 @@ function renderPreAuthStep(){
       <div style="text-align:left;width:100%;max-width:360px;margin:10px 0">
         ${bullets.map(b=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;font-size:13.5px;color:var(--text2);line-height:1.5"><span style="color:var(--accent)">✓</span><span>${b}</span></div>`).join('')}
       </div>
-      <div class="onb-desc">Crea tu cuenta gratis para empezar a trabajar en esto — tu presupuesto sugerido ya va incluido.</div>
+      <div class="onb-desc">${window._replayMode ? 'Ya tienes tu cuenta — sigamos directo al tutorial con este presupuesto ya aplicado.' : 'Crea tu cuenta gratis para empezar a trabajar en esto — tu presupuesto sugerido ya va incluido.'}</div>
     `;
   } else if (preAuthIndex===8){
     html = `
@@ -3716,19 +3708,37 @@ function renderPreAuthStep(){
         <div class="field"><label>Correo electrónico</label><input type="email" id="preAuthEmail" placeholder="tu@correo.com" autocomplete="email"></div>
         <div class="field"><label>Contraseña</label><input type="password" id="preAuthPass" placeholder="mínimo 6 caracteres" autocomplete="new-password"></div>
         <div class="auth-err" id="preAuthErr"></div>
-        <button class="btn" id="preAuthSubmitBtn" onclick="submitPreAuthRegister()">Crear cuenta gratis 🚀</button>
       </div>
     `;
   }
   body.innerHTML = html;
   document.getElementById('preAuthDots').innerHTML = Array.from({length:totalSteps},(_,i)=>`<div class="onb-dot ${i===preAuthIndex?'active':''}"></div>`).join('');
   document.getElementById('preAuthBackBtn').classList.toggle('hidden', preAuthIndex===0);
-  document.getElementById('preAuthNextBtn').classList.toggle('hidden', preAuthIndex===8);
-  document.getElementById('preAuthNextBtn').textContent = preAuthIndex===totalSteps-2 ? 'Crear cuenta gratis 🚀' : 'Siguiente';
+  if (window._replayMode){
+    document.getElementById('preAuthNextBtn').textContent = preAuthIndex===7 ? 'Continuar al tutorial →' : 'Siguiente';
+  } else {
+    document.getElementById('preAuthNextBtn').textContent = preAuthIndex>=7 ? 'Crear cuenta gratis 🚀' : 'Siguiente';
+  }
 }
 function preAuthAnswer(id, val){ preAuthAnswers[id]=val; renderPreAuthStep(); setTimeout(preAuthNext, 220); }
-function preAuthNext(){ if (preAuthIndex < 8) { preAuthIndex++; renderPreAuthStep(); } }
+function preAuthNext(){
+  if (preAuthIndex===7 && window._replayMode){
+    window._pendingSuggestedBudget = suggestedBudgetFromAnswers();
+    document.getElementById('preAuthOverlay').classList.remove('show');
+    window._replayMode = false;
+    openOnboarding();
+    return;
+  }
+  if (preAuthIndex < 8){ preAuthIndex++; renderPreAuthStep(); return; }
+  submitPreAuthRegister();
+}
 function preAuthBack(){ if (preAuthIndex>0){ preAuthIndex--; renderPreAuthStep(); } }
+function openReplayOnboarding(){
+  window._replayMode = true;
+  preAuthIndex = 0; preAuthAnswers = {};
+  renderPreAuthStep();
+  document.getElementById('preAuthOverlay').classList.add('show');
+}
 async function submitPreAuthRegister(){
   const name = document.getElementById('preAuthName').value.trim();
   const email = document.getElementById('preAuthEmail').value.trim();
@@ -3736,7 +3746,7 @@ async function submitPreAuthRegister(){
   const errEl = document.getElementById('preAuthErr');
   errEl.style.color = 'var(--red)'; errEl.textContent = '';
   if (!name || !email || pass.length < 6){ errEl.textContent = 'Completa nombre, correo y una contraseña de mínimo 6 caracteres'; return; }
-  const btn = document.getElementById('preAuthSubmitBtn'); btn.textContent = 'Creando cuenta…';
+  const btn = document.getElementById('preAuthNextBtn'); btn.textContent = 'Creando cuenta…';
   const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ display_name:name } } });
   btn.textContent = 'Crear cuenta gratis 🚀';
   if (error){ errEl.textContent = translateAuthError(error.message); return; }
