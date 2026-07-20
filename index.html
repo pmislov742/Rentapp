@@ -34,7 +34,7 @@ label{ display:block; font-size:12.5px; font-weight:600; color:var(--text2); mar
 .hidden{ display:none !important; }
 
 /* ---------- AUTH ---------- */
-#authScreen{
+#authScreen, #welcomeChoiceScreen{
   min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
   background:radial-gradient(circle at 30% 20%, #10251d 0%, #0B0F14 55%);
 }
@@ -228,7 +228,22 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
 <body>
 
 <!-- ============ AUTH ============ -->
-<div id="authScreen">
+<div id="welcomeChoiceScreen">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="mark">💰</div>
+      <h1>RENTAPP</h1>
+      <p>Tu tracker personal — Panamá</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:14px;color:var(--text2);margin-bottom:18px">¿Cómo quieres empezar?</div>
+      <button class="btn" onclick="chooseReturningUser()">Ya tengo cuenta</button>
+      <button class="btn secondary" style="margin-top:10px" onclick="chooseFirstTime()">Es mi primera vez</button>
+    </div>
+  </div>
+</div>
+
+<div id="authScreen" style="display:none">
   <div class="auth-card">
     <div class="brand">
       <div class="mark">💰</div>
@@ -241,7 +256,7 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
         <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
         <button class="btn" id="loginBtn" onclick="doLogin()">Entrar</button>
         <div class="auth-err" id="loginErr"></div>
-        <div class="link-row">¿Primera vez? <a onclick="showRegister()">Crear cuenta</a></div>
+        <div class="link-row">¿Primera vez? <a onclick="chooseFirstTime()">Crear cuenta</a></div>
       </div>
       <div id="registerForm" class="hidden">
         <div class="field"><label>Nombre</label><input type="text" id="regName" placeholder="¿cómo te llamamos?" autocomplete="name"></div>
@@ -254,6 +269,7 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
     </div>
   </div>
 </div>
+
 
 <!-- ============ APP ============ -->
 <div id="app">
@@ -776,7 +792,6 @@ async function loadAllUserData(){
   data.premiumGiftGranted = !!(setQ.data && setQ.data.premium_gift_granted);
   return data;
 }
-/* ---- persistir campos sueltos de user_settings (color, defaults, contadores de uso) ---- */
 async function persistSetting(patch){
   if (!currentUser) return;
   try{ await sb.from('user_settings').update(patch).eq('user_id', currentUser.id); }catch(e){ /* no bloquea la UI si falla */ }
@@ -866,6 +881,7 @@ async function logout(){
   currentUser = null; userData = null;
   document.getElementById('app').style.display='none';
   document.getElementById('authScreen').style.display='flex';
+  showLogin();
 }
 async function tryResumeSession(){
   const { data } = await sb.auth.getSession();
@@ -877,6 +893,7 @@ async function tryResumeSession(){
 }
 
 function enterApp(){
+  document.getElementById('welcomeChoiceScreen').style.display='none';
   document.getElementById('authScreen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('whoName').textContent = displayName(currentUser);
@@ -3033,7 +3050,7 @@ function renderMore(){
       </div>
       <div class="more-item" onclick="openPreAuthDemo()">
         <div class="more-ic">👋</div>
-        <div class="more-info"><div class="more-name">Bienvenida para nuevos usuarios</div><div class="more-sub">Vista previa — así se ve antes de crear cuenta</div></div>
+        <div class="more-info"><div class="more-name">Bienvenida para nuevos usuarios</div><div class="more-sub">Vista previa del flujo — cierra sesión para probarlo real</div></div>
         <div class="more-chev">›</div>
       </div>
       <div class="more-item" onclick="logout()">
@@ -3413,15 +3430,15 @@ const ONB_STEPS = [
   { icon:'🎨', title:'Hazla tuya', desc:'Elige el color que te va a acompañar en toda la app. Lo puedes cambiar cuando quieras desde Más.', interactive:'color' },
   { icon:'💳', title:'¿Cómo pagas más seguido?', desc:'Lo dejamos preseleccionado la próxima vez que registres un gasto, para que no tengas que elegirlo cada vez.', interactive:'paymethod' },
   { icon:'🎯', title:'Tu presupuesto en un toque', desc:'Elige el estilo que más se parece a ti — lo puedes afinar después en Presupuesto.', interactive:'budget' },
-  { icon:'📊', title:'Mira tu dinero, no solo apúntalo', desc:'Así se ven tus gastos por categoría y tu presupuesto vs lo real una vez que llevas un mes registrando.', chart:'budget' },
-  { icon:'📈', title:'Tendencias a lo largo del año', desc:'Compara mes a mes cómo va cada grupo de tu presupuesto contra tu meta, o profundiza por categoría específica.', chart:'annual' },
-  { icon:'🏆', title:'Metas que sí se cumplen', desc:'Ponte objetivos como "Viaje a Cartagena" o "Cancelar deuda de tarjeta", deposita cuando puedas, y mira tu progreso subir.', chart:'goal' },
+  { icon:'➕', title:'Registra tu primer movimiento', desc:'Así de rápido se registra un ingreso o gasto. Si prefieres hacerlo después, solo toca Siguiente.', interactive:'firsttx' },
+  { icon:'📈', title:'Tendencias a lo largo del año', desc:'Compara mes a mes cómo va cada grupo de tu presupuesto contra tu meta, o profundiza por categoría específica. Esto lo vas a ver crecer en Reportes según registres más.', chart:'annual' },
+  { icon:'🏆', title:'Crea tu primera meta', desc:'Ponle nombre y un monto objetivo — puede ser un viaje, un fondo de emergencia, lo que sea. Si prefieres pensarlo mejor, toca Siguiente y la creas cuando quieras desde Metas.', interactive:'firstgoal' },
   { icon:'🔥', title:'Mantén tu racha', desc:'Cada día que registras algo (o marcas "No gasté hoy") suma a tu racha. Es la forma más simple de crear el hábito de llevar tus finanzas al día.' },
   { icon:'🧾', title:'Tu declaración de renta, ya calculada', desc:'La pestaña Renta suma automáticamente tus deducibles del año y te da un estimado de tu ISR — para que marzo no te agarre de sorpresa.' },
   { icon:'✨', title:'Sigue explorando y gánate 14 días Premium', desc:'En Dashboard vas a ver una barra que se llena mientras más usas la app — metas, reportes, recurrentes, todo suma. Al llegar a 100% te regalamos 2 semanas de Premium.' }
 ];
 let onbIndex = 0;
-function openOnboarding(){ onbIndex = 0; renderOnbStep(); document.getElementById('onboardingOverlay').classList.add('show'); }
+function openOnboarding(){ onbIndex = 0; onbTxType = 'expense'; onbLastTxNote = null; onbLastGoalNote = null; onbAppliedSuggestedBudget = false; onbBudgetShowSliders = false; renderOnbStep(); document.getElementById('onboardingOverlay').classList.add('show'); }
 function renderOnbStep(){
   const step = ONB_STEPS[onbIndex];
   const body = document.getElementById('onbBody');
@@ -3437,8 +3454,47 @@ function renderOnbStep(){
       ${methods.map(m=>`<button class="btn ${userData.lastPaymentMethod===m?'':'secondary'}" onclick="onbPickPayMethod('${m}')">${m}${userData.lastPaymentMethod===m?' ✓':''}</button>`).join('')}
     </div>`;
   } else if (step.interactive==='budget'){
-    interactiveHtml = `<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:360px;margin-top:14px;text-align:left">
-      ${BUDGET_PRESETS.map(p=>`<button class="btn ${userData.budgetPresetId===p.id?'':'secondary'}" style="flex-direction:column;align-items:flex-start;height:auto;padding:12px" onclick="onbPickBudget('${p.id}')"><div style="font-weight:800">${p.label}${userData.budgetPresetId===p.id?' ✓':''}</div><div style="font-size:11px;font-weight:500;opacity:.8;margin-top:3px">${p.desc}</div></button>`).join('')}
+    const pending = window._pendingSuggestedBudget;
+    if (pending){
+      if (!onbAppliedSuggestedBudget){ userData.budget = pending.budget.map(b=>({...b})); userData.budgetCustomized = true; onbAppliedSuggestedBudget = true; }
+      interactiveHtml = `<div class="card" style="text-align:left;margin-top:14px;width:100%;max-width:360px">
+        <div class="sec-title" style="margin-bottom:2px">${pending.label}</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Basado en lo que nos contaste antes de crear tu cuenta.</div>
+        <div class="metric-grid">
+          ${userData.budget.map(b=>`<div class="metric"><div class="metric-label">${b.name}</div><div class="metric-value" style="color:${b.color};font-size:17px">${b.pct}%</div></div>`).join('')}
+        </div>
+        <button class="btn ghost small" style="margin-top:12px;width:100%" onclick="onbToggleBudgetSliders()">${onbBudgetShowSliders?'Ocultar ajustes':'¿Deseas ajustarlo? Toca aquí'}</button>
+        ${onbBudgetShowSliders ? `<div style="margin-top:12px">
+          ${userData.budget.map((b,i)=>`
+            <div class="bslider-row">
+              <div class="bslider-head"><span><span class="swatch" style="background:${b.color}"></span>${b.name}</span><span id="bpct-${i}">${b.pct}%</span></div>
+              <input type="range" id="brange-${i}" min="0" max="100" value="${b.pct}" oninput="onBudgetSlide(${i}, this.value)">
+            </div>`).join('')}
+          <div class="row-between"><span style="font-size:13px;color:var(--text3)">Total</span><b id="budgetTotal">${userData.budget.reduce((a,b)=>a+b.pct,0)}%</b></div>
+        </div>` : ''}
+      </div>`;
+    } else {
+      interactiveHtml = `<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:360px;margin-top:14px;text-align:left">
+        ${BUDGET_PRESETS.map(p=>`<button class="btn ${userData.budgetPresetId===p.id?'':'secondary'}" style="flex-direction:column;align-items:flex-start;height:auto;padding:12px" onclick="onbPickBudget('${p.id}')"><div style="font-weight:800">${p.label}${userData.budgetPresetId===p.id?' ✓':''}</div><div style="font-size:11px;font-weight:500;opacity:.8;margin-top:3px">${p.desc}</div></button>`).join('')}
+      </div>`;
+    }
+  } else if (step.interactive==='firsttx'){
+    interactiveHtml = `<div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px;margin-top:14px;text-align:left">
+      ${onbLastTxNote ? `<div style="font-size:12.5px;color:var(--accent);font-weight:700;text-align:center">✅ ${onbLastTxNote}</div>` : ''}
+      <div class="seg" style="margin:0">
+        <button id="onbTxSegInc" class="${onbTxType==='income'?'active':''} inc" onclick="onbSetTxType('income')">Ingreso</button>
+        <button id="onbTxSegExp" class="${onbTxType==='expense'?'active':''} exp" onclick="onbSetTxType('expense')">Gasto</button>
+      </div>
+      <input type="number" id="onbTxAmount" placeholder="Monto (USD)" step="0.01">
+      <select id="onbTxCategory"></select>
+      <button class="btn" onclick="onbSaveFirstTx()">Registrar ✅</button>
+    </div>`;
+  } else if (step.interactive==='firstgoal'){
+    interactiveHtml = `<div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px;margin-top:14px;text-align:left">
+      ${onbLastGoalNote ? `<div style="font-size:12.5px;color:var(--accent);font-weight:700;text-align:center">✅ ${onbLastGoalNote}</div>` : ''}
+      <input type="text" id="onbGoalName" placeholder="ej. Fondo de emergencia">
+      <input type="number" id="onbGoalTarget" placeholder="Monto objetivo (USD)" step="0.01">
+      <button class="btn" onclick="onbSaveFirstGoal()">Crear meta 🏆</button>
     </div>`;
   }
   body.innerHTML = `
@@ -3453,6 +3509,7 @@ function renderOnbStep(){
   document.getElementById('onbBackBtn').classList.toggle('hidden', onbIndex===0);
   document.getElementById('onbNextBtn').textContent = onbIndex===ONB_STEPS.length-1 ? 'Empezar 🚀' : 'Siguiente';
   if (step.chart) requestAnimationFrame(()=> drawOnbChart(step.chart));
+  if (step.interactive==='firsttx') onbSetTxType(onbTxType);
 }
 function onbPickColor(hex){ userData.accentColor = hex; applyAccentColor(hex); persistSetting({ accent_color: hex }); renderOnbStep(); }
 function onbPickPayMethod(m){ userData.lastPaymentMethod = m; persistSetting({ last_payment_method: m }); renderOnbStep(); }
@@ -3463,6 +3520,58 @@ function onbPickBudget(id){
   userData.budgetPresetId = id;
   userData.budgetCustomized = true;
   persistSetting({ budget: preset.budget, budget_preset_id: id, budget_customized: true });
+  renderOnbStep();
+}
+let onbTxType = 'expense';
+let onbAppliedSuggestedBudget = false;
+let onbBudgetShowSliders = false;
+function onbToggleBudgetSliders(){ onbBudgetShowSliders = !onbBudgetShowSliders; renderOnbStep(); }
+let onbLastTxNote = null;
+let onbLastGoalNote = null;
+function onbSetTxType(type){
+  onbTxType = type;
+  const segInc = document.getElementById('onbTxSegInc'), segExp = document.getElementById('onbTxSegExp');
+  if (segInc) segInc.classList.toggle('active', type==='income');
+  if (segExp) segExp.classList.toggle('active', type==='expense');
+  const catSel = document.getElementById('onbTxCategory');
+  if (!catSel) return;
+  let html = '';
+  if (type==='income'){
+    html = CATS.income.map(c=>`<option>${c}</option>`).join('');
+  } else {
+    Object.entries(CATS.expenseDeducible).forEach(([grp, opts])=>{ html += `<optgroup label="${grp}">${opts.map(o=>`<option>${o}</option>`).join('')}</optgroup>`; });
+    Object.entries(CATS.expenseNoDeducible).forEach(([grp, opts])=>{ html += `<optgroup label="${grp}">${opts.map(o=>`<option>${o}</option>`).join('')}</optgroup>`; });
+  }
+  catSel.innerHTML = html;
+}
+async function onbSaveFirstTx(){
+  const amount = parseFloat(document.getElementById('onbTxAmount').value);
+  const category = document.getElementById('onbTxCategory').value;
+  if (!amount || !category){ showToast('Completa el monto y la categoría'); return; }
+  const date = new Date().toISOString().slice(0,10);
+  const payMethod = userData.lastPaymentMethod || 'Efectivo';
+  const tx = { date, type:onbTxType, amount, category, deducible:false, paymentMethod:payMethod, cardId:null, note:'', recurId:null };
+  try{
+    const row = await dbInsert('transactions', txToRow(tx));
+    userData.transactions.push(txFromRow(row));
+  }catch(e){ return; }
+  onbLastTxNote = `${onbTxType==='income'?'+':'-'}${fmt(amount)} en ${category}`;
+  showToast('¡Tu primer movimiento! 🎉');
+  renderOnbStep();
+}
+async function onbSaveFirstGoal(){
+  const name = document.getElementById('onbGoalName').value.trim();
+  const target = parseFloat(document.getElementById('onbGoalTarget').value);
+  if (!name || !target){ showToast('Completa el nombre y el monto'); return; }
+  try{
+    const row = await dbInsert('goals', { name, emoji:'🏆', target, done:false });
+    userData.goals = userData.goals || [];
+    userData.goals.push(goalFromRow(row));
+  }catch(e){ return; }
+  onbLastGoalNote = `Meta creada: ${escHtml(name)} — ${fmt(target)}`;
+  document.getElementById('onbGoalName').value = '';
+  document.getElementById('onbGoalTarget').value = '';
+  showToast('¡Primera meta creada! 🏆');
   renderOnbStep();
 }
 function drawOnbChart(kind){
@@ -3500,8 +3609,9 @@ async function finishOnboarding(){
   document.getElementById('onboardingOverlay').classList.remove('show');
   if (userData && !userData.onboarded && currentUser){
     userData.onboarded = true;
-    await sb.from('user_settings').update({ onboarded:true }).eq('user_id', currentUser.id);
+    await sb.from('user_settings').update({ onboarded:true, budget:userData.budget, budget_customized:userData.budgetCustomized||false }).eq('user_id', currentUser.id);
   }
+  window._pendingSuggestedBudget = null;
   maybeGrantUsageReward();
   if (document.getElementById('tab-home').classList.contains('active')) renderHome();
 }
@@ -3516,19 +3626,36 @@ const PREAUTH_QUESTIONS = [
 ];
 let preAuthIndex = 0;
 let preAuthAnswers = {};
+function chooseReturningUser(){
+  document.getElementById('welcomeChoiceScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  showLogin();
+}
+function chooseFirstTime(){
+  document.getElementById('welcomeChoiceScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  openPreAuthDemo();
+}
 function openPreAuthDemo(){
   preAuthIndex = 0; preAuthAnswers = {};
   renderPreAuthStep();
   document.getElementById('preAuthOverlay').classList.add('show');
 }
-function closePreAuthDemo(){ document.getElementById('preAuthOverlay').classList.remove('show'); }
+function closePreAuthDemo(){
+  document.getElementById('preAuthOverlay').classList.remove('show');
+  if (!currentUser){ document.getElementById('welcomeChoiceScreen').style.display = 'flex'; }
+}
 function suggestedBudgetFromAnswers(){
   const control = preAuthAnswers.control, goal = preAuthAnswers.goal;
-  if (goal==='Pagar una deuda') return { pct:[45,10,10,5,30], label:'Enfocado en pagar deuda' };
-  if (control==='Gasto más de lo que gano') return { pct:[55,10,20,10,5], label:'Control de gastos' };
-  if (goal==='Invertir más') return { pct:[45,20,10,20,5], label:'Enfocado en invertir' };
-  if (goal==='Ahorrar para una emergencia' || goal==='Ahorrar para algo grande') return { pct:[50,15,25,5,5], label:'Enfocado en ahorrar' };
-  return { pct:[50,20,15,10,5], label:'Equilibrado' };
+  const names = ['Necesidades','Deseos','Ahorros','Inversiones','Deudas'];
+  const colors = ['#3B82F6','#F5A623','#8B7FF5','#22B8CF','#F0475B'];
+  let pct, label;
+  if (goal==='Pagar una deuda'){ pct=[45,10,10,5,30]; label='Enfocado en pagar deuda'; }
+  else if (control==='Gasto más de lo que gano'){ pct=[55,10,20,10,5]; label='Control de gastos'; }
+  else if (goal==='Invertir más'){ pct=[45,20,10,20,5]; label='Enfocado en invertir'; }
+  else if (goal==='Ahorrar para una emergencia' || goal==='Ahorrar para algo grande'){ pct=[50,15,25,5,5]; label='Enfocado en ahorrar'; }
+  else { pct=[50,20,15,10,5]; label='Equilibrado'; }
+  return { pct, label, budget: names.map((n,i)=>({ name:n, pct:pct[i], color:colors[i] })) };
 }
 function helpBulletsFor(goal){
   const map = {
@@ -3541,7 +3668,7 @@ function helpBulletsFor(goal){
 }
 function renderPreAuthStep(){
   const body = document.getElementById('preAuthBody');
-  const totalSteps = 8;
+  const totalSteps = 9;
   let html = '';
   if (preAuthIndex===0){
     html = `
@@ -3560,16 +3687,14 @@ function renderPreAuthStep(){
     `;
   } else if (preAuthIndex===6){
     const sugg = suggestedBudgetFromAnswers();
-    const names = ['Necesidades','Deseos','Ahorros','Inversiones','Deudas'];
-    const colors = ['#3B82F6','#F5A623','#8B7FF5','#22B8CF','#F0475B'];
     html = `
       <div class="onb-icon">🎯</div>
       <div class="onb-tag">${sugg.label}</div>
       <div class="onb-title">Tu presupuesto sugerido</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:360px;margin:14px 0">
-        ${names.map((n,i)=>`<div class="metric"><div class="metric-label">${n}</div><div class="metric-value" style="color:${colors[i]};font-size:19px">${sugg.pct[i]}%</div></div>`).join('')}
+        ${sugg.budget.map(b=>`<div class="metric"><div class="metric-label">${b.name}</div><div class="metric-value" style="color:${b.color};font-size:19px">${b.pct}%</div></div>`).join('')}
       </div>
-      <div class="onb-desc">Basado en tus respuestas, esto es un buen punto de partida. Lo puedes ajustar después, en cualquier momento.</div>
+      <div class="onb-desc">Basado en tus respuestas, esto es un buen punto de partida. Lo vas a poder ajustar con calma justo después de crear tu cuenta.</div>
     `;
   } else if (preAuthIndex===7){
     const bullets = helpBulletsFor(preAuthAnswers.goal);
@@ -3581,15 +3706,49 @@ function renderPreAuthStep(){
       </div>
       <div class="onb-desc">Crea tu cuenta gratis para empezar a trabajar en esto — tu presupuesto sugerido ya va incluido.</div>
     `;
+  } else if (preAuthIndex===8){
+    html = `
+      <div class="onb-icon">🚀</div>
+      <div class="onb-title">Crea tu cuenta gratis</div>
+      <div class="onb-desc" style="margin-bottom:14px">Con esto quedas dentro — tu presupuesto sugerido ya va a estar aplicado.</div>
+      <div style="width:100%;max-width:340px;text-align:left">
+        <div class="field"><label>Nombre</label><input type="text" id="preAuthName" placeholder="¿cómo te llamamos?" autocomplete="name"></div>
+        <div class="field"><label>Correo electrónico</label><input type="email" id="preAuthEmail" placeholder="tu@correo.com" autocomplete="email"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="preAuthPass" placeholder="mínimo 6 caracteres" autocomplete="new-password"></div>
+        <div class="auth-err" id="preAuthErr"></div>
+        <button class="btn" id="preAuthSubmitBtn" onclick="submitPreAuthRegister()">Crear cuenta gratis 🚀</button>
+      </div>
+    `;
   }
   body.innerHTML = html;
   document.getElementById('preAuthDots').innerHTML = Array.from({length:totalSteps},(_,i)=>`<div class="onb-dot ${i===preAuthIndex?'active':''}"></div>`).join('');
   document.getElementById('preAuthBackBtn').classList.toggle('hidden', preAuthIndex===0);
-  document.getElementById('preAuthNextBtn').textContent = preAuthIndex===totalSteps-1 ? 'Crear cuenta gratis 🚀' : 'Siguiente';
+  document.getElementById('preAuthNextBtn').classList.toggle('hidden', preAuthIndex===8);
+  document.getElementById('preAuthNextBtn').textContent = preAuthIndex===totalSteps-2 ? 'Crear cuenta gratis 🚀' : 'Siguiente';
 }
 function preAuthAnswer(id, val){ preAuthAnswers[id]=val; renderPreAuthStep(); setTimeout(preAuthNext, 220); }
-function preAuthNext(){ if (preAuthIndex < 7){ preAuthIndex++; renderPreAuthStep(); } else { closePreAuthDemo(); showToast('En la app real esto crearía tu cuenta con este presupuesto ya configurado 🎉'); } }
+function preAuthNext(){ if (preAuthIndex < 8) { preAuthIndex++; renderPreAuthStep(); } }
 function preAuthBack(){ if (preAuthIndex>0){ preAuthIndex--; renderPreAuthStep(); } }
+async function submitPreAuthRegister(){
+  const name = document.getElementById('preAuthName').value.trim();
+  const email = document.getElementById('preAuthEmail').value.trim();
+  const pass = document.getElementById('preAuthPass').value;
+  const errEl = document.getElementById('preAuthErr');
+  errEl.style.color = 'var(--red)'; errEl.textContent = '';
+  if (!name || !email || pass.length < 6){ errEl.textContent = 'Completa nombre, correo y una contraseña de mínimo 6 caracteres'; return; }
+  const btn = document.getElementById('preAuthSubmitBtn'); btn.textContent = 'Creando cuenta…';
+  const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ display_name:name } } });
+  btn.textContent = 'Crear cuenta gratis 🚀';
+  if (error){ errEl.textContent = translateAuthError(error.message); return; }
+  window._pendingSuggestedBudget = suggestedBudgetFromAnswers();
+  if (!data.session){
+    errEl.style.color = 'var(--accent)';
+    errEl.textContent = '✅ Cuenta creada. Revisa tu correo para confirmarla antes de entrar.';
+    return;
+  }
+  document.getElementById('preAuthOverlay').classList.remove('show');
+  await afterAuthSuccess(data.user);
+}
 
 /* ======================= MODAL HELPERS ======================= */
 function openModal(id){ document.getElementById(id).classList.add('show'); }
