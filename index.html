@@ -1704,14 +1704,12 @@ function despegueRingHtml(){
     </div>`;
 }
 function despeguePiggyHtml(streak){
-  const tiers = [
-    { coin:'radial-gradient(circle at 35% 30%,#e8c9a0,#b8865a 70%,#8a5f38)', shape:'50%' },
-    { coin:'radial-gradient(circle at 35% 30%,#f4f6f8,#c3c9d1 70%,#8f97a3)', shape:'50%' },
-    { coin:'radial-gradient(circle at 35% 30%,#ffe08a,#e0a52e 70%,#b97f16)', shape:'20%' },
-    { coin:'radial-gradient(circle at 35% 30%,#d6f4ff,#7cd6f0 70%,#3ba8c9)', shape:'2px', rot:'45deg' }
-  ];
-  const skin = (typeof currentSkin==='function') ? currentSkin() : null;
-  const tier = tiers[Math.floor((streak||0)/75) % tiers.length];
+  /* El metal del cochinito lo decide el acabado que la persona tenga equipado
+     (ver SKIN_TIERS). Antes se calculaba por racha y por eso no cambiaba al
+     elegir uno nuevo. */
+  const skin = (typeof currentSkin === 'function') ? currentSkin() : null;
+  const tier = skin || { coin:'radial-gradient(circle at 35% 30%,#7df0e2,#3BE0CF 70%,#1fa896)', shape:'50%', body:'var(--accent)' };
+  const body = tier.body || 'var(--accent)';
   const count = Math.min(Math.max(streak||1, 1), 14);
   const coins = [];
   const GOLDEN_ANGLE = 2.399963;
@@ -1727,20 +1725,20 @@ function despeguePiggyHtml(streak){
   return `
     <div style="position:relative;width:100px;height:100px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
       <div style="position:relative;width:100px;height:74px;animation:pig-jiggle 7s ease-in-out infinite;transform-origin:50% 85%">
-        <svg width="22" height="22" viewBox="0 0 22 22" style="position:absolute;left:-18px;top:26px;animation:pig-tail 12s ease-in-out infinite;transform-origin:100% 50%" fill="none"><path d="M20 11c-6 0-10-3-9-7 .8-3 5-3 5.5 0 .5 2.8-2.5 5-5.5 4-2.6-.9-3-4-1-5" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"></path></svg>
-        <div style="position:absolute;top:-7px;right:16px;width:18px;height:16px;background:var(--accent);border-radius:70% 30% 10% 60%;transform:rotate(18deg);animation:pig-ear 12s ease-in-out infinite;transform-origin:50% 100%"></div>
+        <svg width="22" height="22" viewBox="0 0 22 22" style="position:absolute;left:-18px;top:26px;animation:pig-tail 12s ease-in-out infinite;transform-origin:100% 50%" fill="none"><path d="M20 11c-6 0-10-3-9-7 .8-3 5-3 5.5 0 .5 2.8-2.5 5-5.5 4-2.6-.9-3-4-1-5" stroke="${body}" stroke-width="2" stroke-linecap="round"></path></svg>
+        <div style="position:absolute;top:-7px;right:16px;width:18px;height:16px;background:${body};border-radius:70% 30% 10% 60%;transform:rotate(18deg);animation:pig-ear 12s ease-in-out infinite;transform-origin:50% 100%"></div>
         <div style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;background:${tier.coin};z-index:2"></div>
-        <div style="position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:30px;height:7px;border-radius:4px;background:var(--accent);z-index:1"></div>
-        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,224,207,.06);border:3px solid var(--accent);overflow:hidden">
+        <div style="position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:30px;height:7px;border-radius:4px;background:${body};z-index:1"></div>
+        <div style="position:absolute;inset:0;border-radius:50%;background:rgba(var(--ink-rgb),.05);border:3px solid ${body};overflow:hidden">
           ${coins.map(c=>`<div style="position:absolute;left:${c.l};top:${c.t};width:8px;height:8px;border-radius:${tier.shape};transform:translate(-50%,-50%)${tier.rot?' rotate('+tier.rot+')':''};background:${tier.coin};box-shadow:0 1px 1px rgba(0,0,0,.35);animation:coin-hop 7s ease-in-out ${c.d} infinite"></div>`).join('')}
         </div>
-        <div style="position:absolute;right:24px;top:19px;width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pig-blink 5s infinite"></div>
-        <div style="position:absolute;right:-9px;top:26px;width:22px;height:20px;border-radius:8px;background:var(--bg);border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;gap:3px;z-index:2;animation:pig-snout 9s ease-in-out infinite">
-          <div style="width:3px;height:6px;border-radius:2px;background:var(--accent)"></div>
-          <div style="width:3px;height:6px;border-radius:2px;background:var(--accent)"></div>
+        <div style="position:absolute;right:24px;top:19px;width:6px;height:6px;border-radius:50%;background:${body};animation:pig-blink 5s infinite"></div>
+        <div style="position:absolute;right:-9px;top:26px;width:22px;height:20px;border-radius:8px;background:var(--bg);border:3px solid ${body};display:flex;align-items:center;justify-content:center;gap:3px;z-index:2;animation:pig-snout 9s ease-in-out infinite">
+          <div style="width:3px;height:6px;border-radius:2px;background:${body}"></div>
+          <div style="width:3px;height:6px;border-radius:2px;background:${body}"></div>
         </div>
-        <div style="position:absolute;bottom:-8px;left:22px;width:12px;height:10px;border-radius:0 0 6px 6px;background:var(--accent)"></div>
-        <div style="position:absolute;bottom:-8px;right:26px;width:12px;height:10px;border-radius:0 0 6px 6px;background:var(--accent)"></div>
+        <div style="position:absolute;bottom:-8px;left:22px;width:12px;height:10px;border-radius:0 0 6px 6px;background:${body}"></div>
+        <div style="position:absolute;bottom:-8px;right:26px;width:12px;height:10px;border-radius:0 0 6px 6px;background:${body}"></div>
       </div>
     </div>`;
 }
@@ -3914,9 +3912,9 @@ function renderMore(){
         <div class="more-info"><div class="more-name">Ajustes rápidos</div><div class="more-sub">Atajos, modo claro/oscuro</div></div>
         <div class="more-chev">›</div>
       </div>
-      <div class="more-item" onclick="openColorPicker()">
+      <div class="more-item" onclick="openProfileCustomization()">
         <div class="more-ic">🎨</div>
-        <div class="more-info"><div class="more-name">Personalizar color</div></div>
+        <div class="more-info"><div class="more-name">Personalizar mi perfil</div><div class="more-sub">Acabado del cochinito, marco y color</div></div>
         <div class="more-chev">›</div>
       </div>
       <div class="more-item" onclick="openReplayOnboarding()">
@@ -5165,7 +5163,7 @@ function openQuickSettings(){
       : `<div class="empty-state" style="padding:14px"><div class="t">Sin atajos. Crea uno para vaciar tu "sin asignar" de un toque.</div></div>`}
     </div>
 
-    <button class="btn ghost" onclick="closeModal('recapModalOverlay'); openColorPicker()">🎨 Más personalización</button>
+    <button class="btn ghost" onclick="openProfileCustomization()">🎨 Personalizar mi perfil</button>
     <button class="btn ghost" style="margin-top:9px" onclick="closeModal('recapModalOverlay'); openOnboarding()">❓ Ver el tutorial</button>
   `;
   openModal('recapModalOverlay');
@@ -5778,16 +5776,36 @@ function nextFrame(){
 
 /* --- SKINS DEL COCHINITO / ANILLO: uno cada 2 niveles --- */
 const SKIN_TIERS = [
-  { lvl:1,  id:'clasico',  name:'Clásico',        emoji:'🐖', ring:'var(--accent)',  desc:'El cochinito de siempre.' },
-  { lvl:3,  id:'cobre',    name:'Cobre',          emoji:'🐷', ring:'#C08A52', desc:'Tu primer acabado metálico.' },
-  { lvl:5,  id:'plata',    name:'Plata',          emoji:'🐽', ring:'#C9D1D9', desc:'Brilla con la constancia.' },
-  { lvl:7,  id:'oro',      name:'Oro',            emoji:'🪙', ring:'#F0C24A', desc:'El clásico de los que ahorran en serio.' },
-  { lvl:9,  id:'esmeralda',name:'Esmeralda',      emoji:'💚', ring:'#3ECF8E', desc:'Verde de balance positivo sostenido.' },
-  { lvl:11, id:'zafiro',   name:'Zafiro',         emoji:'💙', ring:'#56B8F5', desc:'Frío y calculado.' },
-  { lvl:13, id:'rubi',     name:'Rubí',           emoji:'❤️', ring:'#F2635F', desc:'Para quien mató sus deudas.' },
-  { lvl:15, id:'amatista', name:'Amatista',       emoji:'💜', ring:'#A78BFA', desc:'Inversión constante, mes tras mes.' },
-  { lvl:18, id:'diamante', name:'Diamante',       emoji:'💎', ring:'#9FE7E0', desc:'Casi nadie llega. Tú sí.' },
-  { lvl:22, id:'mogul',    name:'Mogul',          emoji:'👑', ring:'#FFD700', desc:'El acabado final. Mariscal Mogul.' }
+  { lvl:1,  id:'clasico',  name:'Clásico',   emoji:'🐖', ring:'var(--accent)', body:'var(--accent)',
+    coin:'radial-gradient(circle at 35% 30%,#7df0e2,#3BE0CF 70%,#1fa896)', shape:'50%',
+    desc:'El cochinito de siempre.' },
+  { lvl:3,  id:'cobre',    name:'Cobre',     emoji:'🐷', ring:'#C08A52', body:'#C08A52',
+    coin:'radial-gradient(circle at 35% 30%,#e8c9a0,#b8865a 70%,#8a5f38)', shape:'50%',
+    desc:'Tu primer acabado metálico.' },
+  { lvl:5,  id:'plata',    name:'Plata',     emoji:'🐽', ring:'#C9D1D9', body:'#C9D1D9',
+    coin:'radial-gradient(circle at 35% 30%,#f4f6f8,#c3c9d1 70%,#8f97a3)', shape:'50%',
+    desc:'Brilla con la constancia.' },
+  { lvl:7,  id:'oro',      name:'Oro',       emoji:'🪙', ring:'#F0C24A', body:'#F0C24A',
+    coin:'radial-gradient(circle at 35% 30%,#ffe08a,#e0a52e 70%,#b97f16)', shape:'20%',
+    desc:'El clásico de los que ahorran en serio.' },
+  { lvl:9,  id:'esmeralda',name:'Esmeralda', emoji:'💚', ring:'#3ECF8E', body:'#3ECF8E',
+    coin:'radial-gradient(circle at 35% 30%,#9df5c8,#3ECF8E 70%,#1f9a63)', shape:'2px', rot:'45deg',
+    desc:'Verde de balance positivo sostenido.' },
+  { lvl:11, id:'zafiro',   name:'Zafiro',    emoji:'💙', ring:'#56B8F5', body:'#56B8F5',
+    coin:'radial-gradient(circle at 35% 30%,#b3e2ff,#56B8F5 70%,#2a7fb8)', shape:'2px', rot:'45deg',
+    desc:'Frío y calculado.' },
+  { lvl:13, id:'rubi',     name:'Rubí',      emoji:'❤️', ring:'#F2635F', body:'#F2635F',
+    coin:'radial-gradient(circle at 35% 30%,#ffb0ad,#F2635F 70%,#b8332f)', shape:'2px', rot:'45deg',
+    desc:'Para quien mató sus deudas.' },
+  { lvl:15, id:'amatista', name:'Amatista',  emoji:'💜', ring:'#A78BFA', body:'#A78BFA',
+    coin:'radial-gradient(circle at 35% 30%,#d9caff,#A78BFA 70%,#6f4fd1)', shape:'2px', rot:'45deg',
+    desc:'Inversión constante, mes tras mes.' },
+  { lvl:18, id:'diamante', name:'Diamante',  emoji:'💎', ring:'#9FE7E0', body:'#9FE7E0',
+    coin:'radial-gradient(circle at 35% 30%,#e8ffff,#9FE7E0 70%,#5bb5ad)', shape:'2px', rot:'45deg',
+    desc:'Casi nadie llega. Tú sí.' },
+  { lvl:22, id:'mogul',    name:'Mogul',     emoji:'👑', ring:'#FFD700', body:'#FFD700',
+    coin:'radial-gradient(circle at 35% 30%,#fff3b0,#FFD700 70%,#c9a300)', shape:'20%',
+    desc:'El acabado final. Mariscal Mogul.' }
 ];
 function unlockedSkins(){
   const L = userLevel().level;
@@ -5805,11 +5823,11 @@ function equipSkin(id){
   const t = unlockedSkins().find(x=>x.id===id);
   if (!t){ showToast('Todavía no has desbloqueado ese acabado'); return; }
   userData.equippedSkin = id;
-  persistUserState();
+  if (typeof persistUserState === 'function') persistUserState();
   haptic(14);
   showToast(`Acabado ${t.name} equipado ${t.emoji}`);
-  openRewardsCatalog();
-  if (activeTab==='home') renderHome();
+  openProfileCustomization();
+  renderActiveTab();
 }
 
 /* --- ÍCONO DE PANTALLA DE INICIO: solo en el rango tope --- */
@@ -5835,6 +5853,70 @@ function avatarWithFrameHtml(size){
     ${acc>0 ? `<div style="position:absolute;inset:-5px;border-radius:50%;border:1.5px dashed var(--accent);opacity:${.35+acc*.13}"></div>` : ''}
     <div style="position:absolute;inset:0;border-radius:50%;background:var(--surface3);color:var(--text);display:flex;align-items:center;justify-content:center;font-size:${Math.round(s*.42)}px;font-weight:800">${initial}</div>
   </div>`;
+}
+
+/* ======================= PERSONALIZACIÓN DE PERFIL =======================
+   Vive en su propia ventana para no recargar Ajustes rápidos ni Más: desde
+   ahí solo hay un botón que lleva aquí. */
+function openProfileCustomization(){
+  const L = userLevel();
+  const f = currentFrame();
+  const cur = currentSkin();
+  const unlocked = unlockedSkins();
+  const locked = SKIN_TIERS.filter(t=> L.level < t.lvl);
+  const acc = referralAccentLevel();
+
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:28px">🎨</div>
+      <div class="modal-title" style="margin-bottom:2px">Personalizar mi perfil</div>
+      <div style="font-size:11.5px;color:var(--text3)">Elige el acabado que más te guste entre los que ya desbloqueaste</div>
+    </div>
+
+    <div class="card" style="text-align:center;margin-bottom:16px;padding-top:18px">
+      <div style="display:flex;justify-content:center;margin-bottom:6px">${despeguePiggyHtml(computeStreak())}</div>
+      <div style="display:flex;justify-content:center;margin:10px 0 8px">${avatarWithFrameHtml(48)}</div>
+      <div style="font-size:13.5px;font-weight:800">Nivel ${L.level} · ${L.title}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${f.name} · acabado ${cur.name}${acc>0?` · acento de Embajador nv.${acc}`:''}</div>
+    </div>
+
+    <div class="sec-title" style="margin-bottom:8px">Acabados disponibles (${unlocked.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+      ${unlocked.map(t=>`
+        <button class="btn ghost" style="height:auto;padding:10px 4px;flex-direction:column;gap:5px;border-radius:14px;${cur.id===t.id?'border-color:'+t.ring+';background:rgba(var(--ink-rgb),.06)':''}" onclick="equipSkin('${t.id}')">
+          <span style="width:26px;height:26px;border-radius:50%;background:${t.coin};box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+          <span style="font-size:9.5px;font-weight:700;line-height:1.1">${t.name}</span>
+          ${cur.id===t.id?`<span style="font-size:8.5px;color:${t.ring};font-weight:800">EN USO</span>`:''}
+        </button>`).join('')}
+    </div>
+
+    ${locked.length ? `
+      <div class="sec-title" style="margin-bottom:8px">Por desbloquear</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        ${locked.map(t=>`
+          <button class="btn ghost" style="height:auto;padding:10px 4px;flex-direction:column;gap:5px;border-radius:14px;opacity:.45" onclick="showRewardDetail('skin','${t.id}')">
+            <span style="width:26px;height:26px;border-radius:50%;background:${t.coin};filter:grayscale(1);display:flex;align-items:center;justify-content:center;font-size:11px">🔒</span>
+            <span style="font-size:9.5px;font-weight:700;line-height:1.1">${t.name}</span>
+            <span style="font-size:8.5px;color:var(--text3)">Nv. ${t.lvl}</span>
+          </button>`).join('')}
+      </div>` : ''}
+
+    <div class="card" style="padding:4px 12px;margin-bottom:14px">
+      <div class="card-list-item" style="cursor:pointer" onclick="closeModal('recapModalOverlay'); openColorPicker()">
+        <div class="tx-ic" style="background:rgba(var(--ink-rgb),.07)">🎨</div>
+        <div class="tx-info"><div class="tx-name">Color de acento</div><div class="tx-meta">Cambia el color principal de la app</div></div>
+        <div class="more-chev">›</div>
+      </div>
+      <div class="card-list-item" style="cursor:pointer" onclick="showRewardDetail('frame','${f.lvl}')">
+        <div class="tx-ic" style="background:rgba(var(--ink-rgb),.07)">🖼️</div>
+        <div class="tx-info"><div class="tx-name">Marco del avatar</div><div class="tx-meta">${f.name} · sube de nivel para el siguiente</div></div>
+        <div class="more-chev">›</div>
+      </div>
+    </div>
+
+    <button class="btn ghost" onclick="openRewardsCatalog()">🏅 Ver todo el catálogo de recompensas →</button>
+  `;
+  openModal('recapModalOverlay');
 }
 
 /* ======================= CATÁLOGO DE RECOMPENSAS ======================= */
@@ -5863,7 +5945,7 @@ function openRewardsCatalog(){
       <div style="font-size:28px">🏅</div>
       <div class="modal-title" style="margin-bottom:2px">Recompensas</div>
       <div style="font-size:11.5px;color:var(--text3);line-height:1.5;max-width:320px;margin:0 auto">
-        Todo esto se desbloquea subiendo de nivel — y subes de nivel con <b>cualquiera</b> de tus buenos hábitos, no solo invitando gente.
+        Todo esto se desbloquea subiendo de nivel — y subes de nivel con cualquiera de tus buenos hábitos y también invitando gente.
       </div>
     </div>
 
@@ -5908,7 +5990,8 @@ function openRewardsCatalog(){
         unlocked: acc>0, req:'Invita a 1 amigo que complete su Despegue', onclick:`showRewardDetail('refaccent','')` })}
     </div>
 
-    <button class="btn ghost" onclick="openMedalsScreen()">← Volver a mis medallas</button>
+    <button class="btn" onclick="openProfileCustomization()">🎨 Personalizar mi perfil</button>
+    <button class="btn ghost" style="margin-top:9px" onclick="openMedalsScreen()">← Volver a mis medallas</button>
   `;
   openModal('recapModalOverlay');
 }
