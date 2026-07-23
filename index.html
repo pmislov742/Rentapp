@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;1,500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta name="rentapp-build" content="production">
 <style>
 :root{
   --bg:#0D1319; --surface:#141C24; --surface2:#1A232D; --surface3:#232E3D;
@@ -278,7 +278,25 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
 .onb-dot{ width:7px; height:7px; border-radius:50%; background:var(--surface3); }
 .onb-dot.active{ background:var(--accent); width:20px; border-radius:4px; }
 .onb-nav{ display:flex; gap:10px; padding:16px 24px 28px; }
+
+/* ---------- STORIES ---------- */
+.story-overlay{ position:fixed; inset:0; z-index:120; display:none; flex-direction:column; background:#0A1014; overflow:hidden; }
+.story-overlay.show{ display:flex; }
+.story-bars{ position:absolute; top:0; left:0; right:0; display:flex; gap:4px; padding:12px 12px 0; z-index:4; }
+.story-bar{ flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,.22); overflow:hidden; }
+.story-bar-fill{ height:3px; background:#fff; width:0; }
+.story-close{ position:absolute; top:22px; right:14px; z-index:5; background:rgba(255,255,255,.12); border:none; color:#fff; width:32px; height:32px; border-radius:50%; font-size:15px; cursor:pointer; }
+.story-stage{ flex:1; display:flex; align-items:center; justify-content:center; padding:56px 22px 20px; overflow-y:auto; position:relative; z-index:2; }
+.story-slide{ display:flex; flex-direction:column; align-items:center; text-align:center; width:100%; max-width:420px; }
+.story-nav{ position:absolute; inset:0; display:flex; z-index:3; }
+.story-nav > div{ cursor:pointer; }
+.story-foot{ position:relative; z-index:4; text-align:center; padding:10px 0 22px; pointer-events:none; }
+@keyframes story-in{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+@keyframes story-grow{ from{ width:0; } to{ width:var(--w); } }
+.story-grow{ animation:story-grow 1s .3s cubic-bezier(.22,1,.36,1) both; }
+@keyframes medal-pop{ 0%{ opacity:0; transform:scale(.4) rotate(-14deg); } 70%{ transform:scale(1.08) rotate(3deg); } 100%{ opacity:1; transform:none; } }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -291,7 +309,7 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
 <!-- ============ APP ============ -->
 <div id="app">
   <header class="top">
-    <div class="who">Hola, <b id="whoName">—</b></div>
+    <div style="display:flex;align-items:center;gap:9px;min-width:0"><span id="whoAvatar"></span><div class="who">Hola, <b id="whoName">—</b></div></div>
     <div style="display:flex; align-items:center; gap:10px">
       <select class="select-year" id="yearSelect" onchange="onYearChange()"></select>
       <button class="icon-btn" onclick="logout()">⎋</button>
@@ -313,20 +331,7 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
     <div class="tab-content" id="tab-more"></div>
   </main>
 
-  <div id="fabBubbles" class="hidden" style="position:fixed;right:18px;bottom:172px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;z-index:30">
-    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:9px 14px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)" onclick="fabPick('income')">
-      <div style="width:8px;height:8px;border-radius:50%;background:var(--income)"></div>
-      <span style="font-size:13px;font-weight:600">Ingreso</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:9px 14px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)" onclick="fabPick('expense')">
-      <div style="width:8px;height:8px;border-radius:50%;background:var(--red)"></div>
-      <span style="font-size:13px;font-weight:600">Gasto</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:9px 14px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)" onclick="fabPick('investment')">
-      <div style="width:8px;height:8px;border-radius:50%;background:var(--blue)"></div>
-      <span style="font-size:13px;font-weight:600">Inversión</span>
-    </div>
-  </div>
+  <div id="fabBubbles" class="hidden" style="position:fixed;left:12px;right:12px;bottom:158px;z-index:30"></div>
   <button class="fab" id="fabMainBtn" onclick="toggleFabBubbles()">＋</button>
 
   <nav class="tabbar">
@@ -537,6 +542,31 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
   </div>
 </div>
 
+<div class="modal-overlay" id="quickEntryOverlay">
+  <div class="modal-sheet" style="max-width:400px">
+    <div class="modal-handle"></div>
+    <div id="quickEntryBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="shortcutBuilderOverlay">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <div id="shortcutBuilderBody"></div>
+  </div>
+</div>
+
+<div class="story-overlay" id="storyOverlay">
+  <div class="story-bars" id="storyBars"></div>
+  <button class="story-close" onclick="closeStories()">✕</button>
+  <div class="story-stage" id="storyStage"></div>
+  <div class="story-nav">
+    <div style="flex:1" onclick="storyPrev()"></div>
+    <div style="flex:1.4" onclick="storyNext()"></div>
+  </div>
+  <div class="story-foot" id="storyFoot"></div>
+</div>
+
 <div class="modal-overlay" id="confirmModalOverlay">
   <div class="modal-sheet" style="text-align:center">
     <div class="modal-handle"></div>
@@ -551,9 +581,15 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
 
 <script>
 /* ======================= SUPABASE CLIENT ======================= */
-const SUPABASE_URL = 'https://raontltjqxxssklbclzz.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_ACmAKLv8NuOKSa3jykEIFg_VV1fDpG-';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/* ======================= SUPABASE =======================
+   Reemplaza estos dos valores con los de tu proyecto:
+   Supabase Dashboard → Project Settings → API
+   La "anon key" es pública por diseño: la seguridad real vive en las
+   políticas RLS de la base de datos, no en ocultar esta llave. */
+const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU-ANON-KEY';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ======================= DATA LAYER ======================= */
 let currentUser = null, userData = null, activeTab = 'home', activeTxType = 'expense', activeYear = new Date().getFullYear();
@@ -731,7 +767,7 @@ function drawLineChart(containerId, labels, datasets, opts){
   container.appendChild(wrap);
 }
 
-function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[], investments:[], debts:[], generalSavings:{deposits:[]}, checkins:[], onboarded:false, reminderOptIn:false, tier:'trial', trialEndsAt:null, accentColor:null, chartStyle:'classic', themeMode:'dark', lastPaymentMethod:null, budgetCustomized:false, budgetPresetId:null, exploredTabs:{}, weeklyRecapWeeks:[], monthlyAiUses:0, premiumGiftGranted:false }; }
+function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[], investments:[], debts:[], generalSavings:{deposits:[]}, checkins:[], onboarded:false, reminderOptIn:false, tier:'trial', trialEndsAt:null, accentColor:null, chartStyle:'classic', themeMode:'dark', lastPaymentMethod:null, budgetCustomized:false, budgetPresetId:null, exploredTabs:{}, weeklyRecapWeeks:[], monthlyAiUses:0, premiumGiftGranted:false, allocShortcuts:[], txShortcuts:[], xpBonus:0, medalsSeen:[], storiesSeen:[], goalsAchievedLog:[], notifs:[], referralCode:null, referredBy:null, referrals:[], referredBonusClaimed:false, referredStoryClaimed:false, equippedSkin:null }; }
 const DEFAULT_BUDGET = [
   {name:'Necesidades', pct:50, color:'#3BE0CF'},{name:'Deseos', pct:20, color:'#F0B23E'},
   {name:'Ahorros', pct:15, color:'#A78BFA'},{name:'Inversiones', pct:15, color:'#56B8F5'},
@@ -747,11 +783,6 @@ function goalFromRow(r){ return { id:r.id, name:r.name, emoji:r.emoji, target:Nu
 function depFromRow(r){ return { id:r.id, goalId:r.goal_id, date:r.date, amount:Number(r.amount) }; }
 function cardFromRow(r){ return { id:r.id, name:r.name, limit:r.credit_limit!=null?Number(r.credit_limit):null, balance:r.current_balance!=null?Number(r.current_balance):null, cutoffDay:r.cutoff_day||null, payDay:r.payment_day||null, interestRate:r.interest_rate!=null?Number(r.interest_rate):null }; }
 function cardDetailToRow(c){ return { credit_limit:c.limit, current_balance:c.balance, cutoff_day:c.cutoffDay, payment_day:c.payDay, interest_rate:c.interestRate }; }
-function investmentFromRow(r){ return { id:r.id, name:r.name, deposits:[] }; }
-function invDepFromRow(r){ return { id:r.id, investmentId:r.investment_id, date:r.date, amount:Number(r.amount), note:r.note||'' }; }
-function debtFromRow(r){ return { id:r.id, name:r.name, target:Number(r.target), done:!!r.done, payments:[] }; }
-function debtPayFromRow(r){ return { id:r.id, debtId:r.debt_id, date:r.date, amount:Number(r.amount) }; }
-function savingsDepFromRow(r){ return { id:r.id, date:r.date, amount:Number(r.amount) }; }
 
 /* ---- generic CRUD wrappers around Supabase, with a friendly toast on failure ---- */
 async function dbInsert(table, row){
@@ -770,7 +801,8 @@ async function dbDelete(table, id){
 
 /* ---- load everything for the signed-in user in parallel ---- */
 async function loadAllUserData(){
-  const [txQ, recQ, snQ, goalQ, depQ, cardQ, setQ, checkinQ, invQ, invDepQ, debtQ, debtPayQ, savQ] = await Promise.all([
+  const [txQ, recQ, snQ, goalQ, depQ, cardQ, setQ, checkinQ,
+         debtQ, debtPayQ, invQ, invDepQ, savQ] = await Promise.all([
     sb.from('transactions').select('*'),
     sb.from('recurring_items').select('*'),
     sb.from('recur_snoozed').select('*'),
@@ -779,10 +811,10 @@ async function loadAllUserData(){
     sb.from('cards').select('*'),
     sb.from('user_settings').select('*').maybeSingle(),
     sb.from('daily_checkins').select('*'),
-    sb.from('investments').select('*'),
-    sb.from('investment_deposits').select('*'),
     sb.from('debts').select('*'),
     sb.from('debt_payments').select('*'),
+    sb.from('investments').select('*'),
+    sb.from('investment_deposits').select('*'),
     sb.from('general_savings').select('*')
   ]);
   const data = blankData();
@@ -791,44 +823,192 @@ async function loadAllUserData(){
   const snoozed = {};
   (snQ.data||[]).forEach(s=>{ snoozed[s.recur_id] = s.until_date; });
   data.snoozed = snoozed;
+
   data.goals = (goalQ.data||[]).map(goalFromRow);
   (depQ.data||[]).forEach(d=>{
     const g = data.goals.find(g=>g.id===d.goal_id);
     if (g) g.deposits.push(depFromRow(d));
   });
-  data.cards = (cardQ.data||[]).map(cardFromRow);
-  data.investments = (invQ.data||[]).map(investmentFromRow);
-  (invDepQ.data||[]).forEach(d=>{
-    const c = data.investments.find(c=>c.id===d.investment_id);
-    if (c) c.deposits.push(invDepFromRow(d));
-  });
-  data.debts = (debtQ.data||[]).map(debtFromRow);
+
+  /* deudas + abonos */
+  data.debts = (debtQ.data||[]).map(r=>({ id:r.id, name:r.name, target:Number(r.target), done:!!r.done, payments:[] }));
   (debtPayQ.data||[]).forEach(p=>{
-    const dbt = data.debts.find(d=>d.id===p.debt_id);
-    if (dbt) dbt.payments.push(debtPayFromRow(p));
+    const d = data.debts.find(x=>x.id===p.debt_id);
+    if (d) d.payments.push({ id:p.id, debtId:p.debt_id, date:p.date, amount:Number(p.amount) });
   });
-  data.generalSavings = { deposits: (savQ.data||[]).map(savingsDepFromRow) };
-  data.budget = (setQ.data && setQ.data.budget && setQ.data.budget.length) ? setQ.data.budget : DEFAULT_BUDGET;
+
+  /* inversiones + depósitos */
+  data.investments = (invQ.data||[]).map(r=>({ id:r.id, name:r.name, deposits:[] }));
+  (invDepQ.data||[]).forEach(p=>{
+    const i = data.investments.find(x=>x.id===p.investment_id);
+    if (i) i.deposits.push({ id:p.id, investmentId:p.investment_id, date:p.date, amount:Number(p.amount) });
+  });
+
+  /* ahorro general */
+  data.generalSavings = { deposits:(savQ.data||[]).map(r=>({ id:r.id, date:r.date, amount:Number(r.amount) })) };
+
+  data.cards = (cardQ.data||[]).map(cardFromRow);
   data.checkins = (checkinQ.data||[]).map(c=>c.date);
-  data.onboarded = !!(setQ.data && setQ.data.onboarded);
-  data.reminderOptIn = !!(setQ.data && setQ.data.reminder_opt_in);
-  data.tier = (setQ.data && setQ.data.tier) || 'trial';
-  data.trialEndsAt = setQ.data ? setQ.data.trial_ends_at : null;
-  data.accentColor = setQ.data ? (setQ.data.accent_color || null) : null;
-  data.chartStyle = setQ.data ? (setQ.data.chart_style || 'classic') : 'classic';
-  data.themeMode = setQ.data ? (setQ.data.theme_mode || 'dark') : 'dark';
-  data.lastPaymentMethod = setQ.data ? (setQ.data.last_payment_method || null) : null;
-  data.budgetCustomized = !!(setQ.data && setQ.data.budget_customized);
-  data.budgetPresetId = setQ.data ? (setQ.data.budget_preset_id || null) : null;
-  data.exploredTabs = (setQ.data && setQ.data.explored_tabs) || {};
-  data.weeklyRecapWeeks = (setQ.data && setQ.data.weekly_recap_weeks) || [];
-  data.monthlyAiUses = (setQ.data && setQ.data.monthly_ai_uses) || 0;
-  data.premiumGiftGranted = !!(setQ.data && setQ.data.premium_gift_granted);
+
+  const st = setQ.data || {};
+  data.budget = (st.budget && st.budget.length) ? st.budget : DEFAULT_BUDGET;
+  data.onboarded = !!st.onboarded;
+  data.reminderOptIn = !!st.reminder_opt_in;
+  data.tier = st.tier || 'trial';
+  data.trialEndsAt = st.trial_ends_at || null;
+  data.accentColor = st.accent_color || null;
+  data.chartStyle = st.chart_style || 'classic';
+  data.themeMode = st.theme_mode || 'dark';
+  data.budgetCustomized = !!st.budget_customized;
+  data.premiumGiftGranted = !!st.premium_gift_granted;
+  data.monthlyAiUses = st.monthly_ai_uses || 0;
+  data.exploredTabs = st.explored_tabs || {};
+  data.weeklyRecapWeeks = st.weekly_recap_weeks || [];
+
+  /* estado del sistema de progreso (JSON en user_settings) */
+  data.allocShortcuts = st.alloc_shortcuts || [];
+  data.txShortcuts = st.tx_shortcuts || [];
+  data.xpBonus = st.xp_bonus || 0;
+  data.medalsSeen = st.medals_seen || [];
+  data.storiesSeen = st.stories_seen || [];
+  data.notifs = st.notifs || [];
+  data.equippedSkin = st.equipped_skin || null;
+
+  /* referidos */
+  data.referralCode = st.referral_code || null;
+  data.referredBy = st.referred_by || null;
+  data.referrals = st.referrals || [];
+  data.referredBonusClaimed = !!st.referred_bonus_claimed;
+  data.referredStoryClaimed = !!st.referred_story_claimed;
   return data;
+}
+
+/* Guarda el estado que vive solo en el cliente (atajos, XP, medallas vistas,
+   notificaciones, cosmético equipado y referidos). Se llama con debounce para
+   no golpear la base en cada tecla. */
+let _persistStateTimer = null;
+function persistUserState(){
+  if (!currentUser || !userData) return;
+  clearTimeout(_persistStateTimer);
+  _persistStateTimer = setTimeout(()=>{
+    persistSetting({
+      alloc_shortcuts: userData.allocShortcuts || [],
+      tx_shortcuts: userData.txShortcuts || [],
+      xp_bonus: userData.xpBonus || 0,
+      medals_seen: userData.medalsSeen || [],
+      stories_seen: userData.storiesSeen || [],
+      notifs: (userData.notifs || []).slice(0, 60),
+      equipped_skin: userData.equippedSkin || null,
+      referrals: userData.referrals || [],
+      referred_bonus_claimed: !!userData.referredBonusClaimed,
+      referred_story_claimed: !!userData.referredStoryClaimed,
+      explored_tabs: userData.exploredTabs || {},
+      weekly_recap_weeks: userData.weeklyRecapWeeks || [],
+      monthly_ai_uses: userData.monthlyAiUses || 0,
+      premium_gift_granted: !!userData.premiumGiftGranted,
+      budget_customized: !!userData.budgetCustomized
+    });
+  }, 900);
 }
 async function persistSetting(patch){
   if (!currentUser) return;
   try{ await sb.from('user_settings').update(patch).eq('user_id', currentUser.id); }catch(e){ /* no bloquea la UI si falla */ }
+}
+
+/* ======================= VERIFICACIÓN DE CORREO =======================
+   Supabase marca `email_confirmed_at` cuando la persona abre el enlace que
+   le llegó por correo. Es el paso más barato y más efectivo contra las
+   granjas de cuentas: obliga a tener un buzón real y distinto por cuenta.
+   Requiere que "Confirm email" esté ACTIVADO en:
+   Supabase → Authentication → Providers → Email.
+   ===================================================================== */
+function isEmailVerified(){
+  if (!currentUser) return false;
+  return !!(currentUser.email_confirmed_at || currentUser.confirmed_at);
+}
+
+/* Vuelve a preguntarle al servidor si el correo ya fue confirmado.
+   Se llama al entrar a la app y cuando la persona toca "Ya confirmé". */
+async function refreshEmailVerification(){
+  try{
+    const { data, error } = await sb.auth.getUser();
+    if (!error && data && data.user){
+      currentUser = data.user;
+      return isEmailVerified();
+    }
+  }catch(e){ /* sin conexión: no bloqueamos nada */ }
+  return isEmailVerified();
+}
+
+async function resendVerificationEmail(){
+  if (!currentUser || !currentUser.email){ showToast('No hay correo asociado'); return; }
+  const btn = document.getElementById('resendVerifyBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try{
+    const { error } = await sb.auth.resend({ type:'signup', email: currentUser.email });
+    if (error){
+      showToast(/rate/i.test(error.message) ? 'Espera un momento antes de pedir otro correo' : 'No se pudo enviar: '+error.message);
+    } else {
+      showToast('📨 Te enviamos un correo nuevo');
+    }
+  }catch(e){ showToast('No se pudo enviar el correo'); }
+  if (btn){ btn.disabled = false; btn.textContent = '📨 Reenviar correo'; }
+}
+
+function openEmailVerification(){
+  const verified = isEmailVerified();
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:32px">${verified ? '✅' : '✉️'}</div>
+      <div class="modal-title" style="margin:10px 0 2px">${verified ? 'Correo verificado' : 'Verifica tu correo'}</div>
+      <div style="font-size:12.5px;color:var(--text3);line-height:1.55;max-width:320px;margin:0 auto">
+        ${verified
+          ? 'Tu cuenta está protegida y puedes recuperarla si olvidas tu contraseña.'
+          : `Te enviamos un enlace a <b style="color:var(--text2)">${escHtml(currentUser && currentUser.email || '')}</b>. Ábrelo para confirmar que el correo es tuyo.`}
+      </div>
+    </div>
+    ${verified ? '' : `
+      <div class="card" style="padding:13px 15px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--text2);line-height:1.6">
+          <b style="color:var(--text)">¿Por qué importa?</b><br>
+          Sin un correo verificado no podemos devolverte el acceso si olvidas tu contraseña — y tus datos financieros quedarían fuera de tu alcance para siempre.
+        </div>
+      </div>
+      <button class="btn" onclick="confirmEmailVerified()">Ya confirmé mi correo</button>
+      <button class="btn ghost" id="resendVerifyBtn" style="margin-top:9px" onclick="resendVerificationEmail()">📨 Reenviar correo</button>
+      <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.5;margin-top:12px">
+        ¿No te llegó? Revisa la carpeta de spam o correo no deseado.
+      </div>
+    `}
+  `;
+  openModal('recapModalOverlay');
+}
+
+async function confirmEmailVerified(){
+  const ok = await refreshEmailVerification();
+  if (ok){
+    haptic([12,60,18]);
+    showToast('✅ ¡Correo verificado!');
+    closeModal('recapModalOverlay');
+    checkMedalUnlocks();
+    renderActiveTab();
+  } else {
+    showToast('Todavía no lo vemos confirmado — abre el enlace del correo');
+  }
+}
+
+/* Aviso discreto en el dashboard mientras el correo no esté verificado.
+   No es un popup: es una franja que la persona puede tocar cuando quiera. */
+function emailVerifyBannerHtml(){
+  if (isEmailVerified()) return '';
+  return `<div onclick="openEmailVerification()" style="display:flex;align-items:center;gap:9px;background:rgba(240,178,62,.12);border:1px solid var(--amber);border-radius:14px;padding:10px 13px;margin-bottom:12px;cursor:pointer">
+    <span style="font-size:15px">✉️</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12.5px;font-weight:700;color:var(--amber)">Verifica tu correo</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.4">Necesario para recuperar tu cuenta y completar tu Despegue</div>
+    </div>
+    <span style="font-size:12px;color:var(--amber);font-weight:700;white-space:nowrap">Verificar ›</span>
+  </div>`;
 }
 
 /* ---- plan / premium helpers ---- */
@@ -889,6 +1069,12 @@ async function afterAuthSuccess(user){
   currentUser = user;
   userData = await loadAllUserData();
   enterApp();
+  /* Si confirmó el correo en otra pestaña, que se refleje sin tener que
+     cerrar sesión: revalidamos en segundo plano y repintamos si cambió. */
+  const wasVerified = isEmailVerified();
+  refreshEmailVerification().then(now=>{
+    if (now !== wasVerified){ renderActiveTab(); checkMedalUnlocks(); }
+  });
 }
 async function logout(){
   await sb.auth.signOut();
@@ -911,12 +1097,135 @@ function enterApp(){
   document.getElementById('authScreen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('whoName').textContent = displayName(currentUser);
+  const av = document.getElementById('whoAvatar'); if (av) av.innerHTML = avatarWithFrameHtml(34);
   applyThemeMode(userData.themeMode || 'dark');
   if (userData.accentColor) applyAccentColor(userData.accentColor);
   populateYearSelect();
   updateRecurBadge();
   goTab('home');
   if (!userData.onboarded) openOnboarding();
+  else { checkMedalUnlocks(); maybeAutoPremiumStory(); }
+}
+
+/* ======================= VITRINA DE LOGROS =======================
+   En producción no existen cuentas demo. En su lugar mostramos, antes de
+   entrar, una vitrina de lo que puede llegar a lograr alguien que usa la
+   app de forma constante: rangos, medallas, cosméticos y reportes. Es
+   aspiracional y honesto — no promete resultados financieros, muestra
+   funciones reales de la app. */
+
+const SHOWCASE_SLIDES = [
+  {
+    emoji:'🎖', kicker:'SUBE DE RANGO',
+    title:'De Recluta del Ahorro a Mariscal Mogul',
+    body:'Cada buen hábito suma XP: registrar tus gastos, cumplir tu presupuesto, invertir constante, pagar deudas. 20 niveles y 10 títulos por conquistar.',
+    art:'levels'
+  },
+  {
+    emoji:'🏅', kicker:'12 MEDALLAS CON RANGO MILITAR',
+    title:'Bóveda Blindada, Verdugo de Deudas, Cazafortunas…',
+    body:'Cada medalla tiene 5 rangos, de Cabo a General. No se ganan por suerte: miden hábitos reales sostenidos durante meses.',
+    art:'medals'
+  },
+  {
+    emoji:'✨', kicker:'DESBLOQUEA COSMÉTICOS',
+    title:'Marcos, acabados y un ícono exclusivo',
+    body:'Tu avatar cambia de metal según tu rango. Tu cochinito puede llegar a diamante. Y en el nivel más alto, un ícono dorado para tu pantalla de inicio.',
+    art:'cosmetics'
+  },
+  {
+    emoji:'📊', kicker:'TU AÑO, CONTADO',
+    title:'Reportes en formato story, listos para compartir',
+    body:'Cada mes la app arma un resumen animado de cómo te fue: cuánto entró, a dónde se fue, tu tasa de ahorro y qué mejoraste.',
+    art:'stories'
+  },
+  {
+    emoji:'🇵🇦', kicker:'HECHO PARA PANAMÁ',
+    title:'Alineado con la DGI, no adaptado a la fuerza',
+    body:'Categorías de gasto deducible según el Artículo 694 del Código Fiscal, y un estimador de tu declaración de renta durante todo el año.',
+    art:'dgi'
+  }
+];
+
+function showcaseArtHtml(kind){
+  if (kind==='levels'){
+    return `<div style="display:flex;gap:7px;align-items:flex-end;justify-content:center;height:78px">
+      ${[26,36,46,58,72].map((h,i)=>`<div style="width:26px;height:${h}px;border-radius:7px;background:linear-gradient(180deg,${['#C08A52','#C9D1D9','#F0C24A','#9FE7E0','#8FD0FF'][i]},rgba(255,255,255,.06));opacity:.92"></div>`).join('')}
+    </div>`;
+  }
+  if (kind==='medals'){
+    return `<div style="display:flex;gap:8px;justify-content:center;height:78px;align-items:center">
+      ${['🎯','🏦','⚔️','🤝'].map((e,i)=>`
+        <div style="width:44px;height:52px;display:flex;align-items:center;justify-content:center;font-size:19px;background:linear-gradient(160deg,${['#F0C24A','#9FE7E0','#C9D1D9','#C08A52'][i]},rgba(0,0,0,.35));clip-path:polygon(50% 0%,100% 22%,100% 68%,50% 100%,0% 68%,0% 22%)">${e}</div>`).join('')}
+    </div>`;
+  }
+  if (kind==='cosmetics'){
+    return `<div style="display:flex;gap:12px;justify-content:center;height:78px;align-items:center">
+      ${['#C08A52','#C9D1D9','#F0C24A','#9FE7E0'].map((c,i)=>`
+        <div style="position:relative;width:${34+i*4}px;height:${34+i*4}px">
+          <div style="position:absolute;inset:-3px;border-radius:50%;background:linear-gradient(135deg,${c},rgba(0,0,0,.3))"></div>
+          <div style="position:absolute;inset:0;border-radius:50%;background:#141A1F;display:flex;align-items:center;justify-content:center;font-size:${13+i*2}px">${['🐖','🪙','💎','👑'][i]}</div>
+        </div>`).join('')}
+    </div>`;
+  }
+  if (kind==='stories'){
+    return `<div style="display:flex;gap:7px;justify-content:center;height:78px;align-items:center">
+      ${['#0F3B3A','#2C1E52','#123049','#4A2A1C'].map((c,i)=>`
+        <div style="width:36px;height:${58+(i%2)*12}px;border-radius:8px;background:linear-gradient(160deg,${c},#0A1014);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:15px">${['💚','📈','🔥','🎉'][i]}</div>`).join('')}
+    </div>`;
+  }
+  return `<div style="display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;height:78px">
+    <div style="font-size:30px">🧾</div>
+    <div style="font-size:10px;letter-spacing:.14em;color:var(--accent);font-weight:800">ARTÍCULO 694</div>
+  </div>`;
+}
+
+let showcaseIndex = 0, showcaseTimer = null;
+
+function openShowcase(){
+  showcaseIndex = 0;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('welcomeChoiceScreen').style.display = 'flex';
+  renderShowcase();
+}
+function closeShowcase(){
+  clearInterval(showcaseTimer); showcaseTimer = null;
+  renderWelcomeScreen();
+  if (typeof startWelcomeFactRotation === 'function') startWelcomeFactRotation();
+}
+function showcaseGo(i){
+  const n = SHOWCASE_SLIDES.length;
+  showcaseIndex = ((i % n) + n) % n;
+  renderShowcase();
+}
+function renderShowcase(){
+  const s = SHOWCASE_SLIDES[showcaseIndex];
+  const screen = document.getElementById('welcomeChoiceScreen');
+  screen.innerHTML = `
+    ${outsideBgLayersHtml('s')}
+    <div style="position:relative;display:flex;flex-direction:column;align-items:center;width:100%;max-width:400px">
+      ${outsideLogoHtml(.4)}
+      ${outsideWordmarkHtml(24)}
+      <div style="width:100%;background:var(--glass-bg);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:22px;padding:20px 18px;margin-top:16px;text-align:center">
+        <div style="font-size:30px">${s.emoji}</div>
+        <div style="font-size:10px;font-weight:800;letter-spacing:.16em;color:var(--accent);margin-top:10px">${s.kicker}</div>
+        <div style="font-size:16px;font-weight:800;line-height:1.28;margin-top:8px">${s.title}</div>
+        <div style="margin:16px 0 4px">${showcaseArtHtml(s.art)}</div>
+        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;margin-top:10px">${s.body}</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:14px">
+        ${SHOWCASE_SLIDES.map((_,i)=>`<div onclick="showcaseGo(${i})" style="width:${i===showcaseIndex?18:7}px;height:7px;border-radius:4px;background:${i===showcaseIndex?'var(--accent)':'rgba(var(--ink-rgb),.22)'};cursor:pointer;transition:width .3s"></div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;width:100%;margin-top:16px">
+        <button class="btn ghost" style="flex:1" onclick="showcaseGo(${showcaseIndex-1})">‹ Atrás</button>
+        <button class="btn" style="flex:1.4" onclick="showcaseGo(${showcaseIndex+1})">Siguiente ›</button>
+      </div>
+      <button class="btn secondary" style="width:100%;margin-top:9px" onclick="closeShowcase(); chooseFirstTime()">Crear mi cuenta gratis</button>
+      <button class="btn ghost" style="width:100%;margin-top:9px" onclick="closeShowcase()">← Volver</button>
+    </div>
+  `;
+  clearInterval(showcaseTimer);
+  showcaseTimer = setInterval(()=> showcaseGo(showcaseIndex+1), 6500);
 }
 
 function populateYearSelect(){
@@ -937,6 +1246,32 @@ function reportsToggleHtml(active){
     <button class="${active==='monthly'?'active neutral':''}" onclick="goTab('monthly')">Mensual</button>
     <button class="${active==='annual'?'active neutral':''}" onclick="goTab('annual')">Anual</button>
   </div>`;
+}
+function storiesPromoHtml(scope){
+  const L = userLevel();
+  const earned = allMedalStates().filter(s=>s.level>0).length;
+  const label = scope==='year' ? `Tu ${activeYear} en stories` : 'Tu mes en stories';
+  return `
+    <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden;border:1px solid rgba(139,127,245,.45);background:linear-gradient(135deg,rgba(139,127,245,.16),rgba(59,224,207,.10))">
+      <div style="padding:15px 16px">
+        <div style="display:flex;align-items:center;gap:11px">
+          <div style="width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#8B7FF5,#3BE0CF);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">✨</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:800;line-height:1.2">${label}</div>
+            <div style="font-size:11.5px;color:var(--text2);margin-top:3px;line-height:1.4">Un resumen animado y compartible de cómo te fue, generado con IA.</div>
+          </div>
+        </div>
+        <button class="btn" style="margin-top:12px;background:linear-gradient(90deg,#8B7FF5,#3BE0CF);color:var(--avatar-text)" onclick="openStories('${scope}')">▶ Ver mis stories</button>
+        <div style="display:flex;gap:8px;margin-top:9px">
+          <button class="btn small ghost" style="flex:1" onclick="openWeeklyRecap()">📆 Recap semanal</button>
+          <button class="btn small ghost" style="flex:1" onclick="openMonthlyRecap()">🗓️ Recap mensual${isPremiumActive()?'':' ✨'}</button>
+        </div>
+        <div class="row-between" style="margin-top:11px;padding-top:11px;border-top:1px solid var(--border);cursor:pointer" onclick="openMedalsScreen()">
+          <span style="font-size:11.5px;color:var(--text2)">🎖 Nivel ${L.level} · ${earned} medalla${earned===1?'':'s'}</span>
+          <span style="font-size:11.5px;color:var(--accent);font-weight:700">Ver medallas ›</span>
+        </div>
+      </div>
+    </div>`;
 }
 function goTab(tab){
   TABS.forEach(t=>{
@@ -1054,7 +1389,8 @@ async function requestReminderPermission(){
   if (optedIn) maybeShowEveningReminder();
 }
 function maybeShowEveningReminder(){
-  if (!userData.reminderOptIn || Notification.permission!=='granted') return;
+  if (!userData.reminderOptIn) return;
+  if (typeof Notification === 'undefined' || Notification.permission!=='granted') return;
   if (hasEntryToday()) return;
   const hour = new Date().getHours();
   if (hour < 19) return; /* solo molestamos en la noche */
@@ -1336,6 +1672,7 @@ function chooseAccentColor(hex){
 
 /* ======================= BARRA DE ADHERENCIA ======================= */
 const USAGE_MILESTONES = [
+  { id:'emailVerified', label:'Verificar tu correo', icon:'✉️', check: ()=> isEmailVerified(), goTo:'home', action:'openEmailVerification' },
   { id:'onboarded', label:'Completar la introducción', icon:'👋', check: ()=> !!userData.onboarded, goTo:'home', action:'openOnboarding' },
   { id:'firstTx', label:'Registrar tu primer movimiento', icon:'➕', check: ()=> (userData.transactions||[]).length>0, goTo:'txs' },
   { id:'setBudget', label:'Personalizar tu presupuesto', icon:'🎯', check: ()=> !!userData.budgetCustomized, goTo:'budget' },
@@ -1345,7 +1682,8 @@ const USAGE_MILESTONES = [
   { id:'triedUpload', label:'Probar el escaneo de facturas', icon:'📸', check: ()=> !!(userData.exploredTabs && userData.exploredTabs.upload), goTo:'upload' },
   { id:'viewedRenta', label:'Revisar tu estimado de renta', icon:'🧾', check: ()=> !!(userData.exploredTabs && userData.exploredTabs.renta), goTo:'renta' },
   { id:'triedRecap', label:'Ver tu recap semanal', icon:'📆', check: ()=> (userData.weeklyRecapWeeks||[]).length>0, goTo:'home', action:'openWeeklyRecap' },
-  { id:'customizedColor', label:'Elegir tu color favorito', icon:'🎨', check: ()=> !!userData.accentColor, goTo:'home', action:'openColorPicker' }
+  { id:'customizedColor', label:'Elegir tu color favorito', icon:'🎨', check: ()=> !!userData.accentColor, goTo:'home', action:'openColorPicker' },
+  { id:'realStreak', label:'Usar RENTAPP 7 días seguidos', icon:'🔥', check: ()=> computeStreak()>=7, goTo:'home' }
 ];
 let despegueChecklistOpen = false;
 function toggleDespegueChecklist(){ despegueChecklistOpen = !despegueChecklistOpen; renderHome(); }
@@ -1357,7 +1695,7 @@ function despegueRingHtml(){
     <div style="position:relative;width:100px;height:100px;flex-shrink:0">
       <svg width="100" height="100" viewBox="0 0 132 132">
         <circle cx="66" cy="66" r="${R}" fill="none" stroke="rgba(var(--ink-rgb),.08)" stroke-width="11"></circle>
-        <circle cx="66" cy="66" r="${R}" fill="none" stroke="var(--accent)" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${dash}" transform="rotate(-90 66 66)" style="transition:stroke-dashoffset 1.4s cubic-bezier(.22,1,.36,1)"></circle>
+        <circle cx="66" cy="66" r="${R}" fill="none" stroke="${(typeof currentSkin==='function'?currentSkin().ring:'var(--accent)')}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${dash}" transform="rotate(-90 66 66)" style="transition:stroke-dashoffset 1.4s cubic-bezier(.22,1,.36,1)"></circle>
       </svg>
       <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
         <div style="font-size:22px;font-weight:800;font-variant-numeric:tabular-nums">${pct}%</div>
@@ -1372,6 +1710,7 @@ function despeguePiggyHtml(streak){
     { coin:'radial-gradient(circle at 35% 30%,#ffe08a,#e0a52e 70%,#b97f16)', shape:'20%' },
     { coin:'radial-gradient(circle at 35% 30%,#d6f4ff,#7cd6f0 70%,#3ba8c9)', shape:'2px', rot:'45deg' }
   ];
+  const skin = (typeof currentSkin==='function') ? currentSkin() : null;
   const tier = tiers[Math.floor((streak||0)/75) % tiers.length];
   const count = Math.min(Math.max(streak||1, 1), 14);
   const coins = [];
@@ -1497,6 +1836,7 @@ function renderWelcomeScreen(){
         <div style="font-size:14px;font-weight:600;color:var(--text2);text-align:center;margin-bottom:2px">¿Cómo quieres empezar?</div>
         <button class="btn" onclick="chooseReturningUser()" style="box-shadow:0 6px 20px rgba(59,224,207,.25)">Ya tengo cuenta</button>
         <button class="btn secondary" onclick="chooseFirstTime()">Es mi primera vez</button>
+        <button class="btn ghost" style="border:1px dashed var(--accent);color:var(--accent)" onclick="openShowcase()">✨ Ver qué puedes lograr</button>
       </div>
     </div>
   `;
@@ -1515,6 +1855,7 @@ function renderAuthScreen(){
           <button class="btn" id="loginBtn" onclick="doLogin()">Entrar</button>
           <div class="auth-err" id="loginErr"></div>
           <div class="link-row">¿Primera vez? <a onclick="chooseFirstTime()">Crear cuenta</a></div>
+          <div class="link-row" style="margin-top:6px">✨ <a onclick="openShowcase()">Ver qué puedes lograr</a></div>
         </div>
       </div>
     </div>
@@ -1657,29 +1998,89 @@ function renderHome(){
     </div>`;
   }).join('') : '';
 
-  const recent = buildActivityLog(activeYear).slice(0,5);
   const streak = computeStreak();
   const loggedToday = hasEntryToday();
 
+  const activeGoals = (userData.goals||[]).filter(g=>!g.done);
+  const goalsSaved = activeGoals.reduce((a,g)=> a + (g.deposits||[]).reduce((x,d)=>x+d.amount,0), 0);
+  const activeDebts = (userData.debts||[]).filter(d=>!d.done);
+  const debtsLeft = activeDebts.reduce((a,d)=> a + Math.max(0, d.target - (d.payments||[]).reduce((x,p)=>x+p.amount,0)), 0);
+
+  const goalsSection = `
+    <div class="card" style="padding:0;margin-bottom:12px;overflow:hidden">
+      <div class="row-between" style="padding:13px 16px;cursor:pointer" onclick="toggleHomeSection('goals')">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <span style="font-size:17px">🏆</span>
+          <div style="min-width:0">
+            <div style="font-size:13.5px;font-weight:700">Metas activas</div>
+            <div style="font-size:11px;color:var(--text3)">${activeGoals.length ? `${activeGoals.length} en progreso · ${fmt(goalsSaved)} ahorrado` : 'Aún no tienes metas'}</div>
+          </div>
+        </div>
+        <span style="font-size:11.5px;color:var(--accent);font-weight:700;white-space:nowrap">${homeGoalsOpen?'Ocultar ▲':'Ver más ▼'}</span>
+      </div>
+      ${homeGoalsOpen ? `<div style="padding:2px 14px 12px;border-top:1px solid var(--border)">
+        ${activeGoals.length ? activeGoals.slice(0,4).map(g=>{
+          const saved=(g.deposits||[]).reduce((a,d)=>a+d.amount,0);
+          const pct=Math.min(100, Math.round(saved/g.target*100));
+          return `<div class="goal-card" style="margin-top:10px;cursor:pointer" onclick="goTab('goals')">
+            <div class="goal-top"><div><div class="goal-name">${g.emoji||'🏆'} ${escHtml(g.name)}</div><div class="goal-sub">${fmt(saved)} de ${fmt(g.target)}</div></div><b style="color:var(--accent)">${pct}%</b></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('') : `<div class="empty-state" style="padding:14px"><div class="t">Crea tu primera meta de ahorro.</div></div>`}
+        <button class="btn small ghost" style="width:100%;margin-top:10px" onclick="goTab('goals')">Ver todas las metas →</button>
+      </div>` : ''}
+    </div>`;
+
+  const debtsSection = `
+    <div class="card" style="padding:0;margin-bottom:12px;overflow:hidden">
+      <div class="row-between" style="padding:13px 16px;cursor:pointer" onclick="toggleHomeSection('debts')">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <span style="font-size:17px">💳</span>
+          <div style="min-width:0">
+            <div style="font-size:13.5px;font-weight:700">Deudas actuales</div>
+            <div style="font-size:11px;color:var(--text3)">${activeDebts.length ? `${activeDebts.length} activa${activeDebts.length===1?'':'s'} · faltan ${fmt(debtsLeft)}` : 'Sin deudas registradas 🎉'}</div>
+          </div>
+        </div>
+        <span style="font-size:11.5px;color:var(--accent);font-weight:700;white-space:nowrap">${homeDebtsOpen?'Ocultar ▲':'Ver más ▼'}</span>
+      </div>
+      ${homeDebtsOpen ? `<div style="padding:2px 14px 12px;border-top:1px solid var(--border)">
+        ${activeDebts.length ? activeDebts.slice(0,4).map(d=>{
+          const paid=(d.payments||[]).reduce((a,p)=>a+p.amount,0);
+          const pct=Math.min(100, Math.round(paid/d.target*100));
+          return `<div class="goal-card" style="margin-top:10px;cursor:pointer" onclick="goTab('debts')">
+            <div class="goal-top"><div><div class="goal-name">💳 ${escHtml(d.name)}</div><div class="goal-sub">${fmt(paid)} de ${fmt(d.target)}</div></div><b style="color:var(--accent)">${pct}%</b></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('') : `<div class="empty-state" style="padding:14px"><div class="t">Registra una deuda para verla bajar con cada abono.</div></div>`}
+        <button class="btn small ghost" style="width:100%;margin-top:10px" onclick="goTab('debts')">Ir a Deudas →</button>
+      </div>` : ''}
+    </div>`;
+
   document.getElementById('tab-home').innerHTML = `
-    <div class="row-between" style="margin-bottom:10px">
+    ${emailVerifyBannerHtml()}
+    <div class="row-between" style="margin-bottom:10px;gap:8px">
       ${planBadgeHtml()}
-      <div style="display:flex;gap:8px">
-        <button class="btn small ghost" onclick="openWeeklyRecap()">📆 Recap</button>
-        <button class="btn small ghost" onclick="openOnboarding()">❓ Tutorial</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        ${headerIconBtnHtml('recur')}
+        ${headerIconBtnHtml('medal')}
+        <button class="btn small ghost" style="white-space:nowrap" onclick="openQuickSettings()">⚙️ Ajustes</button>
       </div>
     </div>
     <div class="card despegue-card" style="background:rgba(59,224,207,.07);border:1px solid rgba(59,224,207,.25);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:16px;cursor:pointer" onclick="toggleDespegueChecklist()">
-        ${userData.premiumGiftGranted ? despeguePiggyHtml(streak) : despegueRingHtml()}
-        <div style="display:flex;flex-direction:column;gap:7px;min-width:0;flex:1">
-          <div style="font-size:15px;font-weight:700">${userData.premiumGiftGranted ? '¡Completaste tu Despegue!' : 'Tu Despegue'}</div>
-          <div style="font-size:12px;color:var(--text2)">${userData.premiumGiftGranted ? 'Sigue así — ya desbloqueaste tu recompensa' : 'Explora la app y desbloquea 14 días Premium'}</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="cursor:pointer;flex-shrink:0" onclick="toggleDespegueChecklist()">${userData.premiumGiftGranted ? despeguePiggyHtml(streak) : despegueRingHtml()}</div>
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0;flex:1;cursor:pointer" onclick="toggleDespegueChecklist()">
+          <div style="font-size:14.5px;font-weight:700;line-height:1.25">${userData.premiumGiftGranted ? '¡Completaste tu Despegue!' : 'Tu Despegue'}</div>
           <div style="display:flex;align-items:center;gap:6px;background:rgba(var(--ink-rgb),.06);border-radius:999px;padding:5px 10px;width:fit-content">
-            <span style="font-size:12px">🪙</span>
-            <span style="font-size:12px;font-weight:600">${streak} ${streak===1?'día':'días'} de racha</span>
+            <span style="font-size:12px">🔥</span>
+            <span style="font-size:12px;font-weight:700">${streak} ${streak===1?'día':'días'} de racha</span>
           </div>
-          <div style="font-size:11px;color:var(--accent);font-weight:600">${despegueChecklistOpen?'Ocultar detalle ▲':'Ver detalle ▼'}</div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.35">${loggedToday ? '¡Ya registraste algo hoy! 💪' : 'Aún no registras nada hoy'}</div>
+          <div style="font-size:11px;color:var(--accent);font-weight:700">${despegueChecklistOpen?'Ocultar detalle ▲':'Ver detalle ▼'}</div>
+        </div>
+        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+          ${levelChipHtml()}
+          ${loggedToday ? '' : `<button class="btn small" style="white-space:nowrap" onclick="logNoSpendToday()">No gasté hoy</button>`}
         </div>
       </div>
       ${!userData.premiumGiftGranted ? `
@@ -1694,7 +2095,12 @@ function renderHome(){
           <span style="font-size:18px">🎁</span>
           <div><div style="font-size:13px;font-weight:800;color:var(--accent)">¡Premium activado!</div>
           <div style="font-size:11px;color:var(--text2)">Tu Despegue llegó al 100%</div></div>
-          <div style="margin-left:auto;background:var(--accent);color:var(--avatar-text);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:800">14 días restantes</div>
+          <div style="margin-left:auto;background:var(--accent);color:var(--avatar-text);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:800">${trialDaysLeft()} días restantes</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:2px 2px 0;cursor:pointer" onclick="openReferralScreen()">
+          <span style="font-size:13px">🔁</span>
+          <span style="font-size:11.5px;color:var(--text2)">Invita a alguien y gana <b style="color:var(--accent)">+3 días más</b> — ellos también ganan</span>
+          <span style="margin-left:auto;font-size:11.5px;color:var(--accent);font-weight:700">Invitar ›</span>
         </div>
       `}
       ${despegueChecklistOpen ? `
@@ -1709,15 +2115,7 @@ function renderHome(){
         </div>
       ` : ''}
     </div>
-    <div class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:16px;${loggedToday?'':'border-color:var(--amber)'}">
-      <div style="font-size:32px">🔥</div>
-      <div style="flex:1">
-        <div style="font-weight:800;font-size:16px">${streak} ${streak===1?'día':'días'} de racha</div>
-        <div style="font-size:11.5px;color:var(--text3)">${loggedToday ? '¡Ya registraste algo hoy! 💪' : 'Aún no registras nada hoy'}</div>
-      </div>
-      ${loggedToday ? '' : `<button class="btn small" onclick="logNoSpendToday()">No gasté hoy</button>`}
-    </div>
-    ${userData.reminderOptIn ? '' : `<div class="row-between" style="margin:-10px 0 16px;padding:0 4px"><span style="font-size:11px;color:var(--text3)">🔔 Recibe un recordatorio si se te olvida registrar</span><button class="btn small ghost" onclick="requestReminderPermission()">Activar</button></div>`}
+    ${userData.reminderOptIn ? '' : `<div class="row-between" style="margin:-8px 0 14px;padding:0 4px"><span style="font-size:11px;color:var(--text3)">🔔 Recibe un recordatorio si se te olvida registrar</span><button class="btn small ghost" onclick="requestReminderPermission()">Activar</button></div>`}
     <div class="hero" style="text-align:center">
       <div class="lbl">Balance del año ${activeYear}</div>
       <div class="big" style="color:${balance>=0?'var(--accent)':'var(--red)'}">${fmt(balance)}</div>
@@ -1741,14 +2139,12 @@ function renderHome(){
         <div id="dashInsightText" style="font-size:11.5px;color:var(--text2);transition:opacity .4s"></div>
       </div>
     </div>
-    ${goalsHtml ? `<div class="row-between" style="margin-bottom:10px"><div class="sec-title" style="margin-bottom:0">Metas activas</div><button class="btn small ghost" onclick="goTab('goals')">Ver todas</button></div>${goalsHtml}` : ''}
     <div class="sec-title" style="margin-top:16px">Presupuesto de este mes</div>
-    <div class="card" style="padding:2px 16px;margin-bottom:14px">${budgetHtml}</div>
-    ${unassignedCardHtml(income, nowSpent)}
-    <div class="row-between" style="margin-bottom:10px"><div class="sec-title" style="margin-bottom:0">Movimientos recientes</div><button class="btn small ghost" onclick="goTab('txs')">Ver todo</button></div>
-    <div class="card" style="padding:6px 14px">
-      ${recent.length ? recent.map(e=>activityRowHtml(e)).join('') : `<div class="empty-state"><div class="ic">🌱</div><div class="t">Aún no hay movimientos. Toca + para agregar el primero.</div></div>`}
-    </div>
+    <div class="card" style="padding:2px 16px;margin-bottom:12px">${budgetHtml}</div>
+    ${unassignedCardHtml(income, nowSpent, true)}
+    ${goalsSection}
+    ${debtsSection}
+    ${homeMedalsSectionHtml()}
   `;
   startDashInsightRotation(dashboardInsights(income, expense, prevIncome, prevExpense, nowSpent, budget));
   maybeShowEveningReminder();
@@ -1940,6 +2336,7 @@ function renderMonthly(){
   document.getElementById('tab-monthly').innerHTML = `
     <div class="section-title">Reportes</div>
     ${reportsToggleHtml('monthly')}
+    ${storiesPromoHtml('month')}
     <div class="field"><select id="monthSelect" onchange="renderMonthlyDetail(this.value)">
       ${Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}" ${m===month?'selected':''}>${monthName(m)}</option>`).join('')}
     </select></div>
@@ -1974,7 +2371,7 @@ function renderMonthlyDetail(m){
       <div class="metric"><div class="metric-label">Ingresos</div><div class="metric-value" style="color:var(--accent);font-size:18px">${fmt(income)}</div></div>
       <div class="metric"><div class="metric-label">Gastos</div><div class="metric-value" style="color:var(--red);font-size:18px">${fmt(expense)}</div></div>
     </div>
-    ${unassignedCardHtml(income, spent)}
+    ${unassignedCardHtml(income, spent, true)}
 
     <div class="sec-title">Gastos por categoría</div>
     <div class="chart-wrap tall" id="monthlyCatChart"></div>
@@ -2198,12 +2595,13 @@ function renderAnnual(){
   document.getElementById('tab-annual').innerHTML = `
     <div class="section-title">Reportes</div>
     ${reportsToggleHtml('annual')}
+    ${storiesPromoHtml('year')}
     <div class="sec-title">Resumen anual ${activeYear}</div>
     <div class="metric-grid">
       <div class="metric"><div class="metric-label">Ingresos totales</div><div class="metric-value" style="color:var(--accent);font-size:18px">${fmt(income)}</div></div>
       <div class="metric"><div class="metric-label">Gastos totales</div><div class="metric-value" style="color:var(--red);font-size:18px">${fmt(expense)}</div></div>
     </div>
-    ${unassignedCardHtml(income, annualSpent)}
+    ${unassignedCardHtml(income, annualSpent, true)}
     <div class="sec-title">Ingresos vs gastos por mes</div>
     <div class="chart-wrap" id="annualBarChart"></div>
     <div style="font-size:11px;color:var(--text3);margin-top:-6px;margin-bottom:14px;text-align:center">💡 Toca una barra para ver el detalle exacto de ese mes</div>
@@ -2301,28 +2699,91 @@ function unassignedAmount(income, spentObj){
   const assigned = (spentObj.Necesidades||0)+(spentObj.Deseos||0)+(spentObj.Ahorros||0)+(spentObj.Inversiones||0)+(spentObj.Deudas||0);
   return income - assigned;
 }
-function unassignedCardHtml(income, spentObj){
+function unassignedCardHtml(income, spentObj, withShortcuts){
   if (income<=0) return '';
   const unassigned = unassignedAmount(income, spentObj);
   if (unassigned > 0.5){
-    return `<div class="card" style="margin:-4px 0 16px;border-color:var(--amber)">
-      <div class="row-between">
-        <div><div style="font-size:13px;font-weight:700">Sin asignar</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Ingresaste más de lo que categorizaste este mes</div></div>
-        <b style="font-size:17px;color:var(--amber)">${fmt(unassigned)}</b>
-      </div>
-      <button class="btn small" style="margin-top:10px;width:100%" onclick="openAllocateSurplus(${unassigned.toFixed(2)})">Enviar a algún lado →</button>
+    const chips = withShortcuts ? allocShortcutChipsHtml(unassigned) : '';
+    return `<div style="margin:0 0 12px">
+      <button class="btn small" style="width:100%;height:auto;padding:11px 14px;background:rgba(240,178,62,.14);border:1px solid var(--amber);color:var(--amber);display:flex;align-items:center;justify-content:space-between;gap:10px" onclick="openAllocateSurplus(${unassigned.toFixed(2)})">
+        <span style="font-size:12.5px;font-weight:700;white-space:nowrap">💰 Ingreso sin asignar</span>
+        <span style="font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums">${fmt(unassigned)} →</span>
+      </button>
+      ${chips}
     </div>`;
   }
   if (unassigned < -0.5){
-    return `<div class="card" style="margin:-4px 0 16px;border-color:var(--red)">
-      <div class="row-between">
-        <div style="font-size:13px;font-weight:700">Gastaste de más</div>
-        <b style="font-size:17px;color:var(--red)">${fmt(-unassigned)}</b>
+    return `<div style="margin:0 0 12px">
+      <div style="width:100%;padding:11px 14px;border-radius:14px;background:rgba(242,99,95,.12);border:1px solid var(--red);color:var(--red);display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span style="font-size:12.5px;font-weight:700">⚠️ Gastaste de más</span>
+        <span style="font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums">${fmt(-unassigned)}</span>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">Tus gastos categorizados superan lo que ingresó este mes.</div>
     </div>`;
   }
   return '';
+}
+
+/* ---- ATAJOS DE ASIGNACIÓN: botones configurables bajo el "sin asignar" ---- */
+function allocShortcutLabel(sc){
+  const dest = sc.targetName || 'Ahorro general';
+  const part = sc.mode==='all' ? 'Todo' : fmt(sc.amount||0);
+  return `${part} → ${dest}`;
+}
+function allocShortcutChipsHtml(available){
+  const list = userData.allocShortcuts || [];
+  const chips = list.map(sc=>`
+    <button class="btn small ghost" style="width:auto;height:auto;padding:7px 11px;font-size:11.5px;border-radius:999px;white-space:nowrap" onclick="runAllocShortcut('${sc.id}', ${Number(available).toFixed(2)})">
+      ${sc.emoji||'⚡'} ${escHtml(allocShortcutLabel(sc))}
+    </button>`).join('');
+  return `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px">
+    ${chips}
+    <button class="btn small ghost" style="width:auto;height:auto;padding:7px 11px;font-size:11.5px;border-radius:999px;border-style:dashed;white-space:nowrap" onclick="openShortcutBuilder('alloc')">＋ Atajo</button>
+  </div>`;
+}
+async function runAllocShortcut(id, available){
+  const sc = (userData.allocShortcuts||[]).find(x=>x.id===id);
+  if (!sc){ showToast('Ese atajo ya no existe'); return; }
+  let amount = sc.mode==='all' ? Number(available) : Math.min(Number(sc.amount||0), Number(available));
+  amount = Math.round(amount*100)/100;
+  if (!amount || amount<=0){ showToast('No hay sobrante para enviar'); return; }
+  allocSurplus = { amount, type:sc.targetType, targetId:sc.targetId };
+  const ok = await applyAllocation(sc.targetType, sc.targetId, amount);
+  if (ok){ awardXp(15, 'Atajo usado'); renderActiveTab(); }
+}
+async function applyAllocation(type, targetId, amount){
+  const dateStr = new Date().toISOString().slice(0,10);
+  try{
+    if (type==='goal'){
+      const g = (userData.goals||[]).find(x=>x.id===targetId);
+      if (!g){ showToast('La meta ya no existe'); return false; }
+      const row = await dbInsert('goal_deposits', { goal_id:g.id, date:dateStr, amount });
+      g.deposits = g.deposits || []; g.deposits.push(depFromRow(row));
+      showToast(`💪 ${fmt(amount)} enviado a ${g.name}`);
+    } else if (type==='debt'){
+      const dbt = (userData.debts||[]).find(x=>x.id===targetId);
+      if (!dbt){ showToast('La deuda ya no existe'); return false; }
+      const row = await dbInsert('debt_payments', { debt_id:dbt.id, date:dateStr, amount });
+      dbt.payments = dbt.payments || []; dbt.payments.push({ id:row.id, debtId:dbt.id, date:dateStr, amount });
+      showToast(`💳 ${fmt(amount)} abonado a ${dbt.name}`);
+    } else if (type==='investment'){
+      const inv = (userData.investments||[]).find(x=>x.id===targetId);
+      if (!inv){ showToast('La inversión ya no existe'); return false; }
+      const row = await dbInsert('investment_deposits', { investment_id:inv.id, date:dateStr, amount });
+      inv.deposits = inv.deposits || []; inv.deposits.push({ id:row.id, investmentId:inv.id, date:dateStr, amount });
+      showToast(`📈 ${fmt(amount)} enviado a ${inv.name}`);
+    } else if (type==='savings'){
+      userData.generalSavings = userData.generalSavings || { deposits:[] };
+      const row = await dbInsert('general_savings', { date:dateStr, amount });
+      userData.generalSavings.deposits.push({ id:row.id, date:dateStr, amount });
+      showToast(`💰 ${fmt(amount)} enviado a ahorro general`);
+    } else if (type==='category'){
+      const newTx = { date:dateStr, type:'expense', amount, category:targetId, deducible:false, paymentMethod:userData.lastPaymentMethod||'Efectivo', cardId:null, note:'Asignado desde sobrante', recurId:null };
+      const row = await dbInsert('transactions', txToRow(newTx));
+      userData.transactions.push(txFromRow(row));
+      showToast(`✅ ${fmt(amount)} asignado a ${targetId}`);
+    } else { return false; }
+  }catch(e){ return false; }
+  return true;
 }
 
 /* ---- asignar el sobrante: meta, ahorro general o deuda ---- */
@@ -2354,7 +2815,23 @@ function renderAllocateSurplusStep(){
         <button class="btn secondary" onclick="allocSurplusPickType('savings')">💰 Ahorro general</button>
         <button class="btn secondary" onclick="allocSurplusPickType('investment')">📈 A una inversión</button>
         <button class="btn secondary" onclick="allocSurplusPickType('debt')">💳 A una deuda</button>
+        <button class="btn secondary" onclick="allocSurplusPickType('category')">🧾 A una categoría de gasto</button>
+        <div style="height:1px;background:var(--border);margin:6px 0"></div>
+        <button class="btn ghost" style="border:1px dashed var(--accent);color:var(--accent)" onclick="openShortcutBuilder('alloc')">⚡ Crear un atajo</button>
+        <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.45">Un atajo es un botón fijo debajo del "sin asignar" que manda un monto fijo — o todo el sobrante — a donde tú digas, de un solo toque.</div>
       </div>
+    `;
+    return;
+  }
+  if (allocSurplus.type==='category'){
+    const cats = [...Object.values(CATS.expenseDeducible).flat(), ...Object.values(CATS.expenseNoDeducible).flat()];
+    body.innerHTML = `
+      <div class="modal-title" style="margin-bottom:10px;text-align:center">Elige la categoría</div>
+      <div class="field"><select id="allocCatSelect" onchange="allocSurplusPickTarget(this.value)">
+        ${cats.map(c=>`<option value="${escHtml(c)}" ${allocSurplus.targetId===c?'selected':''}>${escHtml(c)}</option>`).join('')}
+      </select></div>
+      ${(()=>{ if(!allocSurplus.targetId) allocSurplus.targetId = cats[0]; return ''; })()}
+      ${allocSurplusAmountFieldHtml()}
     `;
     return;
   }
@@ -2416,33 +2893,9 @@ async function confirmAllocateSurplus(){
   const amount = parseFloat(amountInput ? amountInput.value : allocSurplus.amount);
   if (!amount || amount<=0){ showToast('Ingresa un monto válido'); return; }
   if (allocSurplus.type!=='savings' && !allocSurplus.targetId){ showToast('Elige a dónde mandarlo'); return; }
-  const dateStr = new Date().toISOString().slice(0,10);
-  try{
-    if (allocSurplus.type==='goal'){
-      const g = userData.goals.find(x=>x.id===allocSurplus.targetId);
-      if (!g) return;
-      const row = await dbInsert('goal_deposits', { goal_id:g.id, date:dateStr, amount });
-      g.deposits = g.deposits || []; g.deposits.push(depFromRow(row));
-      showToast(`💪 ${fmt(amount)} enviado a ${g.name}`);
-    } else if (allocSurplus.type==='debt'){
-      const dbt = userData.debts.find(x=>x.id===allocSurplus.targetId);
-      if (!dbt) return;
-      const row = await dbInsert('debt_payments', { debt_id:dbt.id, date:dateStr, amount });
-      dbt.payments = dbt.payments || []; dbt.payments.push({ id:row.id, debtId:dbt.id, date:dateStr, amount });
-      showToast(`💳 ${fmt(amount)} abonado a ${dbt.name}`);
-    } else if (allocSurplus.type==='investment'){
-      const inv = (userData.investments||[]).find(x=>x.id===allocSurplus.targetId);
-      if (!inv) return;
-      const row = await dbInsert('investment_deposits', { investment_id:inv.id, date:dateStr, amount });
-      inv.deposits = inv.deposits || []; inv.deposits.push({ id:row.id, investmentId:inv.id, date:dateStr, amount });
-      showToast(`📈 ${fmt(amount)} enviado a ${inv.name}`);
-    } else if (allocSurplus.type==='savings'){
-      userData.generalSavings = userData.generalSavings || { deposits:[] };
-      const row = await dbInsert('general_savings', { date:dateStr, amount });
-      userData.generalSavings.deposits.push({ id:row.id, date:dateStr, amount });
-      showToast(`💰 ${fmt(amount)} enviado a ahorro general`);
-    }
-  }catch(e){ return; }
+  const ok = await applyAllocation(allocSurplus.type, allocSurplus.targetId, amount);
+  if (!ok) return;
+  awardXp(20, 'Sobrante asignado');
   closeModal('recapModalOverlay');
   renderActiveTab();
 }
@@ -2464,7 +2917,35 @@ function renderGoals(){
     <div class="sec-title">En progreso</div>
     ${active.length ? active.map(g=>goalCardHtml(g)).join('') : `<div class="card"><div class="empty-state" style="padding:20px"><div class="ic">🌱</div><div class="t">Crea tu primera meta: un viaje, un fondo de emergencia, cancelar una deuda…</div></div></div>`}
     ${done.length ? `<div class="sec-title" style="margin-top:18px">Cumplidas 🎉</div>${done.map(g=>goalCardHtml(g)).join('')}` : ''}
+    ${medalsSectionHtml()}
   `;
+}
+function medalsSectionHtml(){
+  const L = userLevel();
+  const states = allMedalStates().sort((a,b)=> b.level-a.level || b.pct-a.pct);
+  const earned = states.filter(s=>s.level>0);
+  const shown = (earned.length ? earned : states).slice(0,3);
+  return `
+    <div class="sec-title" style="margin-top:24px">Medallas y rango 🎖</div>
+    <div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,rgba(139,127,245,.13),rgba(59,224,207,.08));border-color:rgba(139,127,245,.4)">
+      <div class="row-between" style="margin-bottom:8px">
+        <div>
+          <div style="font-size:15px;font-weight:800">Nivel ${L.level}</div>
+          <div style="font-size:11.5px;color:var(--accent);font-weight:700">${L.title}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:800;font-variant-numeric:tabular-nums">${L.xp.toLocaleString('en-US')} XP</div>
+          <div style="font-size:10.5px;color:var(--text3)">${earned.length}/${states.length} medallas</div>
+        </div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${L.pct}%"></div></div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:6px">Faltan ${Math.max(0,L.next-L.xp).toLocaleString('en-US')} XP para el nivel ${L.level+1}</div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn small" style="flex:1" onclick="openMedalsScreen()">Ver todas</button>
+        <button class="btn small ghost" style="flex:1" onclick="openRewardsCatalog()">🏅 Recompensas</button>
+      </div>
+    </div>
+    ${shown.map(s=>medalCardHtml(s,true)).join('')}`;
 }
 function goalCardHtml(g){
   const saved = (g.deposits||[]).reduce((a,d)=>a+d.amount,0);
@@ -2744,10 +3225,8 @@ async function confirmNewInvestmentCategoryStandalone(){
   const name = document.getElementById('newInvCatName').value.trim();
   if (!name){ showToast('Escribe un nombre'); return; }
   userData.investments = userData.investments || [];
-  try{
-    const row = await dbInsert('investments', { name });
-    userData.investments.push(investmentFromRow(row));
-  }catch(e){ return; }
+  const invRow = await dbInsert('investments', { name });
+  userData.investments.push({ id:invRow.id, name, deposits:[] });
   closeModal('recapModalOverlay');
   renderInvestments();
   showToast('Categoría creada ✅');
@@ -3146,6 +3625,7 @@ async function payRecur(id){
       const row = await dbInsert('investment_deposits', { investment_id:inv.id, date, amount:r.amount, note:'Recurrente: '+r.name });
       inv.deposits = inv.deposits || []; inv.deposits.push({ id:row.id, investmentId:inv.id, date, amount:r.amount, note:'Recurrente: '+r.name });
     }catch(e){ return; }
+    pushNotif('recur', escHtml(r.name), `Inversión recurrente de ${fmt(r.amount)} registrada`, '📈');
     renderRecur(); updateRecurBadge(); showToast('📈 Inversión registrada');
     return;
   }
@@ -3155,6 +3635,8 @@ async function payRecur(id){
     const row = await dbInsert('transactions', txToRow(tx));
     userData.transactions.push(txFromRow(row));
   }catch(e){ return; }
+  pushNotif('recur', escHtml(r.name), `${isIncome?'Cobro':'Pago'} recurrente de ${fmt(r.amount)} registrado`, isIncome?'💵':'🔁');
+  checkMedalUnlocks();
   renderRecur(); updateRecurBadge(); showToast(isIncome?'💵 Cobro registrado':'Pago registrado');
 }
 async function snoozeRecur(id){
@@ -3358,10 +3840,25 @@ function renderMore(){
         <div class="more-info"><div class="more-name">Recap semanal</div><div class="more-sub">Tu semana en números</div></div>
         <div class="more-chev">›</div>
       </div>
+      <div class="more-item" onclick="openStories('month')">
+        <div class="more-ic">✨</div>
+        <div class="more-info"><div class="more-name">Mis stories</div><div class="more-sub">Resumen animado y compartible de tu progreso</div></div>
+        <div class="more-chev">›</div>
+      </div>
       <div class="more-item" onclick="openMonthlyRecap()">
         <div class="more-ic">🗓️</div>
         <div class="more-info"><div class="more-name">Recap mensual</div><div class="more-sub">Resumen completo del mes${isPremiumActive()?'':' — Premium'}</div></div>
         ${isPremiumActive()?'':'<span class="more-badge" style="background:var(--purple)">✨</span>'}
+        <div class="more-chev">›</div>
+      </div>
+      <div class="more-item" onclick="openEmailVerification()">
+        <div class="more-ic">${isEmailVerified() ? '✅' : '✉️'}</div>
+        <div class="more-info"><div class="more-name">Verificación de correo</div><div class="more-sub">${isEmailVerified() ? 'Tu cuenta está protegida' : 'Pendiente — necesaria para recuperar tu cuenta'}</div></div>
+        <div class="more-chev">›</div>
+      </div>
+      <div class="more-item" onclick="openReferralScreen()">
+        <div class="more-ic">🎁</div>
+        <div class="more-info"><div class="more-name">Invita y gana Premium</div><div class="more-sub">3 días gratis por amigo · ellos también ganan</div></div>
         <div class="more-chev">›</div>
       </div>
       <div class="more-item" onclick="goTab('upload')">
@@ -3401,6 +3898,21 @@ function renderMore(){
       <div class="more-item" style="cursor:default">
         <div class="more-ic">👤</div>
         <div class="more-info"><div class="more-name">${escHtml(displayName(currentUser))}</div><div class="more-sub">${escHtml(currentUser?.email||'')}</div></div>
+      </div>
+      <div class="more-item" onclick="openRewardsCatalog()">
+        <div class="more-ic">🏅</div>
+        <div class="more-info"><div class="more-name">Recompensas y cosméticos</div><div class="more-sub">Marcos, acabados y todo lo que puedes desbloquear</div></div>
+        <div class="more-chev">›</div>
+      </div>
+      <div class="more-item" onclick="openMedalsScreen()">
+        <div class="more-ic">🎖</div>
+        <div class="more-info"><div class="more-name">Mis medallas y nivel</div><div class="more-sub">Nivel ${userLevel().level} · ${allMedalStates().filter(s=>s.level>0).length} medallas desbloqueadas</div></div>
+        <div class="more-chev">›</div>
+      </div>
+      <div class="more-item" onclick="openQuickSettings()">
+        <div class="more-ic">⚙️</div>
+        <div class="more-info"><div class="more-name">Ajustes rápidos</div><div class="more-sub">Atajos, modo claro/oscuro</div></div>
+        <div class="more-chev">›</div>
       </div>
       <div class="more-item" onclick="openColorPicker()">
         <div class="more-ic">🎨</div>
@@ -3544,7 +4056,7 @@ function openMonthlyRecap(){
       <div class="row-between"><span style="font-size:13.5px;color:var(--text2)">Balance del mes</span><b style="font-size:16px;color:${net>=0?'var(--accent)':'var(--red)'}">${fmt(net)}</b></div>
       <div class="row-between" style="margin-top:8px"><span style="font-size:13.5px;color:var(--text2)">Gastos deducibles (DGI)</span><b style="font-size:14px;color:var(--cyan)">${fmt(dedTotal)}</b></div>
     </div>
-    ${unassignedCardHtml(inc, nowSpentB)}
+    ${unassignedCardHtml(inc, nowSpentB, true)}
     ${topCats.length ? `<div class="sec-title">Tus categorías top</div><div class="card" style="padding:6px 14px;margin-bottom:14px">
       ${topCats.map(([c,v])=>`<div class="card-list-item"><div class="tx-info"><div class="tx-name">${escHtml(c)}</div></div><div class="tx-amt">${fmt(v)}</div></div>`).join('')}
     </div>` : ''}
@@ -3564,16 +4076,256 @@ let editTxId = null;
 let fabBubblesOpen = false;
 function toggleFabBubbles(){
   fabBubblesOpen = !fabBubblesOpen;
-  document.getElementById('fabBubbles').classList.toggle('hidden', !fabBubblesOpen);
+  const el = document.getElementById('fabBubbles');
+  if (fabBubblesOpen) renderFabPanel();
+  el.classList.toggle('hidden', !fabBubblesOpen);
   document.getElementById('fabMainBtn').style.transform = fabBubblesOpen ? 'rotate(45deg)' : 'rotate(0)';
 }
-function fabPick(type){
+function closeFabPanel(){
   fabBubblesOpen = false;
   document.getElementById('fabBubbles').classList.add('hidden');
   document.getElementById('fabMainBtn').style.transform = 'rotate(0)';
-  openTxModal();
-  setTxType(type);
 }
+
+/* ---- sugerencias de IA local: montos y categorías más repetidos ---- */
+function aiTxSuggestions(limit){
+  const txs = userData.transactions || [];
+  const buckets = {};
+  txs.slice(-120).forEach(t=>{
+    if (t.type!=='expense' && t.type!=='income') return;
+    const rounded = Math.round(t.amount);
+    const key = t.type+'|'+t.category+'|'+rounded;
+    buckets[key] = buckets[key] || { type:t.type, category:t.category, amount:rounded, n:0, deducible:!!t.deducible };
+    buckets[key].n++;
+  });
+  let list = Object.values(buckets).filter(b=>b.n>=2).sort((a,b)=>b.n-a.n);
+  if (list.length < 2){
+    const byCat = {};
+    txs.filter(t=>t.type==='expense').forEach(t=>{ byCat[t.category] = byCat[t.category]||{sum:0,n:0}; byCat[t.category].sum+=t.amount; byCat[t.category].n++; });
+    const extra = Object.entries(byCat).sort((a,b)=>b[1].n-a[1].n).slice(0,3)
+      .map(([c,v])=>({ type:'expense', category:c, amount:Math.round(v.sum/v.n), n:v.n, deducible:false }));
+    const seen = new Set(list.map(x=>x.type+x.category+x.amount));
+    extra.forEach(e=>{ if(!seen.has(e.type+e.category+e.amount)) list.push(e); });
+  }
+  const exist = new Set((userData.txShortcuts||[]).map(sc=>sc.type+sc.category+Math.round(sc.amount)));
+  return list.filter(b=>!exist.has(b.type+b.category+b.amount)).slice(0, limit||3);
+}
+
+function renderFabPanel(){
+  const el = document.getElementById('fabBubbles');
+  const types = [
+    { id:'income',     label:'Ingreso',   color:'var(--income)', icon:'＋' },
+    { id:'expense',    label:'Gasto',     color:'var(--red)',    icon:'−' },
+    { id:'investment', label:'Inversión', color:'var(--blue)',   icon:'📈' },
+    { id:'savings',    label:'Ahorro',    color:'var(--purple)', icon:'🐖' }
+  ];
+  const shortcuts = userData.txShortcuts || [];
+  const sugg = aiTxSuggestions(3);
+  el.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:0 10px 34px rgba(0,0,0,.35)">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">
+        ${types.map(t=>`
+          <button class="btn ghost" style="height:auto;padding:9px 4px;flex-direction:column;gap:3px;border-radius:14px" onclick="fabPick('${t.id}')">
+            <span style="width:22px;height:22px;border-radius:50%;background:${t.color};color:var(--avatar-text);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">${t.icon}</span>
+            <span style="font-size:10.5px;font-weight:700">${t.label}</span>
+          </button>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin:10px 0 6px">
+        <span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--text3)">ATAJOS</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <button class="btn small ghost" style="width:auto;height:auto;padding:4px 9px;font-size:10.5px;border-radius:999px" onclick="openShortcutBuilder('tx')">＋ Nuevo</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${shortcuts.length ? shortcuts.slice(0,6).map(sc=>`
+          <button class="btn small" style="width:auto;height:auto;padding:7px 11px;font-size:11.5px;border-radius:999px;background:rgba(var(--ink-rgb),.07);color:var(--text);border:1px solid var(--border);white-space:nowrap" onclick="runTxShortcut('${sc.id}')">
+            ${sc.emoji||'⚡'} ${escHtml(sc.label||sc.category)} · ${fmt(sc.amount)}${sc.type==='investment'?' 📈':sc.type==='savings'?' 🐖':''}
+          </button>`).join('')
+        : `<span style="font-size:11px;color:var(--text3);padding:4px 2px">Crea atajos para tus movimientos de siempre.</span>`}
+      </div>
+      ${sugg.length ? `
+        <div style="display:flex;align-items:center;gap:6px;margin:11px 0 6px">
+          <span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--purple)">✨ SUGERIDO POR IA</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${sugg.map((sg,i)=>`
+            <button class="btn small ghost" style="width:auto;height:auto;padding:7px 11px;font-size:11.5px;border-radius:999px;border:1px solid rgba(139,127,245,.5);color:var(--purple);white-space:nowrap" onclick="fabUseSuggestion(${i})">
+              ${sg.type==='income'?'＋':'−'} ${escHtml(sg.category.length>20?sg.category.slice(0,20)+'…':sg.category)} · ${fmt(sg.amount)}
+            </button>`).join('')}
+        </div>` : ''}
+    </div>`;
+  window._fabSuggestions = sugg;
+}
+
+function fabUseSuggestion(i){
+  const sg = (window._fabSuggestions||[])[i];
+  if (!sg) return;
+  closeFabPanel();
+  openQuickEntry(sg.type, { amount:sg.amount, category:sg.category, deducible:sg.deducible, fromSuggestion:true });
+}
+function fabPick(type){
+  closeFabPanel();
+  openQuickEntry(type, {});
+}
+
+/* ======================= REGISTRO RÁPIDO (ventana chica) ======================= */
+let quickEntry = { type:'expense', category:null, deducible:false };
+function quickCatsFor(type){
+  if (type==='income') return CATS.income;
+  return [...Object.values(CATS.expenseDeducible).flat(), ...Object.values(CATS.expenseNoDeducible).flat()];
+}
+function openQuickEntry(type, opts){
+  opts = opts || {};
+  quickEntry = {
+    type,
+    category: opts.category || topCategoriesFor(type,1)[0] || quickCatsFor(type)[0],
+    deducible: !!opts.deducible,
+    prefill: opts.amount || ''
+  };
+  renderQuickEntry();
+  openModal('quickEntryOverlay');
+  setTimeout(()=>{ const a=document.getElementById('qeAmount'); if(a) a.focus(); }, 120);
+}
+function quickSetCategory(v){ quickEntry.category = v; }
+function quickPickFreq(i){
+  const c = (window._qeFreq||[])[i];
+  if (!c) return;
+  const amtEl = document.getElementById('qeAmount');
+  quickEntry.prefill = amtEl ? amtEl.value : quickEntry.prefill;
+  quickEntry.category = c;
+  renderQuickEntry();
+}
+function quickToggleDeducible(el){ quickEntry.deducible = !!el.checked; }
+function renderQuickEntry(){
+  const t = quickEntry.type;
+  const meta = {
+    income:     { title:'Nuevo ingreso',     emoji:'💵', color:'var(--income)' },
+    expense:    { title:'Nuevo gasto',       emoji:'🧾', color:'var(--red)' },
+    investment: { title:'Nueva inversión',   emoji:'📈', color:'var(--blue)' },
+    savings:    { title:'Depositar en ahorros', emoji:'🐖', color:'var(--purple)' }
+  }[t];
+  const freq = topCategoriesFor(t, 3);
+  window._qeFreq = freq;
+  let picker = '';
+  if (t==='investment'){
+    const invs = userData.investments || [];
+    picker = invs.length
+      ? `<div class="field"><label>Categoría de inversión</label><select id="qeInvCat">${invs.map(c=>`<option value="${c.id}">${escHtml(c.name)}</option>`).join('')}</select></div>`
+      : `<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Aún no tienes categorías de inversión — escribe una abajo.</div>
+         <div class="field"><label>Nueva categoría</label><input type="text" id="qeInvNew" placeholder="ej. Fondo indexado"></div>`;
+  } else if (t==='savings'){
+    const goals = (userData.goals||[]).filter(g=>!g.done);
+    picker = `<div class="field"><label>¿A dónde?</label><select id="qeSavingsTarget">
+        <option value="general">💰 Ahorro general</option>
+        ${goals.map(g=>`<option value="${g.id}">${g.emoji||'🏆'} ${escHtml(g.name)}</option>`).join('')}
+      </select></div>`;
+  } else {
+    const cats = quickCatsFor(t);
+    picker = `
+      ${freq.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        ${freq.map((c,i)=>`<button class="btn small ghost" style="width:auto;height:auto;padding:6px 10px;font-size:11px;border-radius:999px;${quickEntry.category===c?'border-color:var(--accent);color:var(--accent)':''}" onclick="quickPickFreq(${i})">⭐ ${escHtml(c.length>22?c.slice(0,22)+'…':c)}</button>`).join('')}
+      </div>` : ''}
+      <div class="field"><label>Categoría</label><select id="qeCat" onchange="quickSetCategory(this.value)">
+        ${cats.map(c=>`<option value="${escHtml(c)}" ${quickEntry.category===c?'selected':''}>${escHtml(c)}</option>`).join('')}
+      </select></div>
+      ${t==='expense' ? `<label class="chk-row" style="cursor:pointer"><input type="checkbox" id="qeDeducible" ${quickEntry.deducible?'checked':''} onchange="quickToggleDeducible(this)"><span>Es deducible según DGI (Art. 694)</span></label>` : ''}`;
+  }
+  document.getElementById('quickEntryBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span style="font-size:24px">${meta.emoji}</span>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:800;line-height:1.2">${meta.title}</div>
+        <div style="font-size:11px;color:var(--text3)">Rápido — solo lo esencial</div>
+      </div>
+    </div>
+    <div class="field"><label>Monto (USD)</label>
+      <input type="number" id="qeAmount" inputmode="decimal" step="0.01" placeholder="0.00" value="${quickEntry.prefill||''}" style="font-size:22px;font-weight:800;height:56px;color:${meta.color}">
+    </div>
+    ${picker}
+    <button class="btn" onclick="saveQuickEntry()">Guardar</button>
+    <div style="display:flex;gap:8px;margin-top:9px">
+      <button class="btn ghost" style="flex:1" onclick="closeModal('quickEntryOverlay')">Cancelar</button>
+      ${t!=='savings' ? `<button class="btn ghost" style="flex:1" onclick="closeModal('quickEntryOverlay'); openTxModal(); setTxType('${t}')">Más detalles →</button>` : ''}
+    </div>
+  `;
+}
+async function saveQuickEntry(){
+  const amount = parseFloat(document.getElementById('qeAmount').value);
+  if (!amount || amount<=0){ showToast('Escribe un monto válido'); return; }
+  const date = new Date().toISOString().slice(0,10);
+  const t = quickEntry.type;
+  try{
+    if (t==='savings'){
+      const target = document.getElementById('qeSavingsTarget').value;
+      if (target==='general'){
+        userData.generalSavings = userData.generalSavings || { deposits:[] };
+        const row = await dbInsert('general_savings', { date, amount });
+        userData.generalSavings.deposits.push({ id:row.id, date, amount });
+        showToast(`🐖 ${fmt(amount)} a tu ahorro general`);
+      } else {
+        const g = userData.goals.find(x=>x.id===target);
+        if (!g){ showToast('Elige un destino'); return; }
+        const row = await dbInsert('goal_deposits', { goal_id:g.id, date, amount });
+        g.deposits = g.deposits || []; g.deposits.push(depFromRow(row));
+        showToast(`🏆 ${fmt(amount)} a ${g.name}`);
+      }
+    } else if (t==='investment'){
+      let catId = null;
+      const sel = document.getElementById('qeInvCat');
+      if (sel){ catId = sel.value; }
+      else {
+        const name = (document.getElementById('qeInvNew').value||'').trim();
+        if (!name){ showToast('Escribe el nombre de la inversión'); return; }
+        const invRow2 = await dbInsert('investments', { name });
+        catId = invRow2.id;
+        userData.investments = userData.investments || [];
+        userData.investments.push({ id:catId, name, deposits:[] });
+      }
+      const cat = userData.investments.find(c=>c.id===catId);
+      const row = await dbInsert('investment_deposits', { investment_id:catId, date, amount });
+      cat.deposits = cat.deposits || []; cat.deposits.push({ id:row.id, investmentId:catId, date, amount });
+      showToast(`📈 ${fmt(amount)} invertido`);
+    } else {
+      const category = document.getElementById('qeCat').value;
+      const deducible = t==='expense' && !!(document.getElementById('qeDeducible')||{}).checked;
+      const newTx = { date, type:t, amount, category, deducible, paymentMethod:userData.lastPaymentMethod||'Efectivo', cardId:null, note:'', recurId:null };
+      const row = await dbInsert('transactions', txToRow(newTx));
+      userData.transactions.push(txFromRow(row));
+      showToast(t==='income' ? `💵 ${fmt(amount)} registrado` : `🧾 ${fmt(amount)} registrado`);
+    }
+  }catch(e){ return; }
+  awardXp(10, 'Movimiento registrado');
+  closeModal('quickEntryOverlay');
+  populateYearSelect(); destroyCharts(); renderActiveTab(); updateRecurBadge();
+  checkMedalUnlocks();
+}
+async function runTxShortcut(id){
+  const sc = (userData.txShortcuts||[]).find(x=>x.id===id);
+  if (!sc) return;
+  closeFabPanel();
+  const date = new Date().toISOString().slice(0,10);
+  try{
+    if (sc.type==='savings'){
+      userData.generalSavings = userData.generalSavings || { deposits:[] };
+      const row = await dbInsert('general_savings', { date, amount:sc.amount });
+      userData.generalSavings.deposits.push({ id:row.id, date, amount:sc.amount });
+    } else if (sc.type==='investment'){
+      const inv = (userData.investments||[]).find(x=>x.id===sc.investmentId);
+      if (!inv){ showToast('Esa categoría de inversión ya no existe'); return; }
+      const row = await dbInsert('investment_deposits', { investment_id:inv.id, date, amount:sc.amount });
+      inv.deposits = inv.deposits || []; inv.deposits.push({ id:row.id, investmentId:inv.id, date, amount:sc.amount });
+    } else {
+      const newTx = { date, type:sc.type, amount:sc.amount, category:sc.category, deducible:!!sc.deducible, paymentMethod:userData.lastPaymentMethod||'Efectivo', cardId:null, note:'', recurId:null };
+      const row = await dbInsert('transactions', txToRow(newTx));
+      userData.transactions.push(txFromRow(row));
+    }
+  }catch(e){ return; }
+  awardXp(10, 'Atajo usado');
+  showToast(`⚡ ${sc.label||sc.category} · ${fmt(sc.amount)} registrado`);
+  populateYearSelect(); destroyCharts(); renderActiveTab(); updateRecurBadge();
+  checkMedalUnlocks();
+}
+
 function openTxModal(){
   editTxId = null;
   document.getElementById('txModalTitle').textContent = 'Nueva transacción';
@@ -3674,16 +4426,12 @@ function toggleNewInvestmentCategoryRow(){
   document.getElementById('txInvAddBtn').classList.add('hidden');
   document.getElementById('txInvNewName').focus();
 }
-async function confirmNewInvestmentCategory(){
+function confirmNewInvestmentCategory(){
   const name = document.getElementById('txInvNewName').value.trim();
   if (!name){ showToast('Escribe un nombre'); return; }
+  const id = 'inv-'+Math.random().toString(36).slice(2,9);
   userData.investments = userData.investments || [];
-  let id;
-  try{
-    const row = await dbInsert('investments', { name });
-    id = row.id;
-    userData.investments.push(investmentFromRow(row));
-  }catch(e){ return; }
+  userData.investments.push({ id, name, deposits:[] });
   populateInvCategorySelect();
   document.getElementById('txInvCategory').value = id;
   document.getElementById('txInvNewName').value = '';
@@ -3797,16 +4545,12 @@ const BUDGET_PRESETS = [
   { id:'flexible', label:'Flexible', desc:'55% Necesidades · 25% Deseos · 10% Ahorros · 10% Inversiones', budget:[{name:'Necesidades',pct:55,color:'#3BE0CF'},{name:'Deseos',pct:25,color:'#F0B23E'},{name:'Ahorros',pct:10,color:'#A78BFA'},{name:'Inversiones',pct:10,color:'#56B8F5'},{name:'Deudas',pct:0,color:'#F2635F'}] }
 ];
 const ONB_STEPS = [
-  { icon:'💰', title:'Bienvenido a RENTAPP', desc:'Tu tracker financiero personal, pensado para Panamá. Vamos a dejar todo listo en un par de toques — nada de formularios largos.' },
-  { icon:'🎨', title:'Hazla tuya', desc:'Elige el color que te va a acompañar en toda la app. Lo puedes cambiar cuando quieras desde Más.', interactive:'color' },
+  { icon:'💰', title:'Bienvenido a RENTAPP', desc:'Tu tracker financiero personal, pensado para Panamá. Empecemos por elegir el color que te va a acompañar en toda la app — lo puedes cambiar cuando quieras desde Más.', interactive:'color' },
   { icon:'💳', title:'¿Cómo pagas más seguido?', desc:'Lo dejamos preseleccionado la próxima vez que registres un gasto, para que no tengas que elegirlo cada vez.', interactive:'paymethod' },
   { icon:'🎯', title:'Tu presupuesto en un toque', desc:'Elige el estilo que más se parece a ti — lo puedes afinar después en Presupuesto.', interactive:'budget' },
   { icon:'➕', title:'Registra tu primer movimiento', desc:'Así de rápido se registra un ingreso o gasto. Si prefieres hacerlo después, solo toca Siguiente.', interactive:'firsttx' },
-  { icon:'📈', title:'Tendencias a lo largo del año', desc:'Compara mes a mes cómo va cada grupo de tu presupuesto contra tu meta, o profundiza por categoría específica. Esto lo vas a ver crecer en Reportes según registres más.', chart:'annual' },
   { icon:'🏆', title:'Crea tu primera meta', desc:'Ponle nombre y un monto objetivo — puede ser un viaje, un fondo de emergencia, lo que sea. Si prefieres pensarlo mejor, toca Siguiente y la creas cuando quieras desde Metas.', interactive:'firstgoal' },
-  { icon:'🔥', title:'Mantén tu racha', desc:'Cada día que registras algo (o marcas "No gasté hoy") suma a tu racha. Es la forma más simple de crear el hábito de llevar tus finanzas al día.' },
-  { icon:'🧾', title:'Tu declaración de renta, ya calculada', desc:'La pestaña Renta suma automáticamente tus deducibles del año y te da un estimado de tu ISR — para que marzo no te agarre de sorpresa.' },
-  { icon:'✨', title:'Sigue explorando y gánate 14 días Premium', desc:'En Dashboard vas a ver una barra que se llena mientras más usas la app — metas, reportes, recurrentes, todo suma. Al llegar a 100% te regalamos 2 semanas de Premium.' }
+  { icon:'🔥', title:'Mantén tu racha y gánate 14 días Premium', desc:'Cada día que registras algo suma a tu racha. Y en Dashboard vas a ver una barra que se llena mientras más uses la app — al llegar a 100% te regalamos 2 semanas de Premium.' }
 ];
 let onbIndex = 0;
 function openOnboarding(){ onbIndex = 0; onbTxType = 'expense'; onbLastTxNote = null; onbLastGoalNote = null; onbAppliedSuggestedBudget = false; onbBudgetShowSliders = false; renderOnbStep(); document.getElementById('onboardingOverlay').classList.add('show'); }
@@ -4038,31 +4782,40 @@ function helpBulletsFor(goal){
   };
   return map[goal] || map['Ahorrar para una emergencia'];
 }
+function questionBlockHtml(q){
+  return `
+    <div class="onb-title" style="font-size:16.5px;margin-top:12px">${q.q}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;margin-top:10px;margin-bottom:8px">
+      ${q.options.map(o=>`<button class="btn ${preAuthAnswers[q.id]===o?'':'secondary'}" onclick="preAuthAnswer('${q.id}', this.dataset.val)" data-val="${escHtml(o)}">${o}${preAuthAnswers[q.id]===o?' ✓':''}</button>`).join('')}
+    </div>
+  `;
+}
 function renderPreAuthStep(){
   const body = document.getElementById('preAuthBody');
-  const totalSteps = window._replayMode ? 8 : 9;
+  const totalSteps = window._replayMode ? 4 : 5;
   let html = '';
   if (preAuthIndex===0){
-    html = window._replayMode ? `
-      <div class="onb-icon">👋</div>
-      <div class="onb-title">Repasemos juntos</div>
-      <div class="onb-desc">Las mismas 5 preguntas de antes, para refrescar tu presupuesto sugerido, y luego seguimos directo al tutorial. Puedes cerrar en cualquier momento sin perder nada de tu cuenta.</div>
-    ` : `
-      <div class="onb-icon">👋</div>
-      <div class="onb-title">¡Es tu primera vez en RENTAPP!</div>
-      <div class="onb-desc">Antes de crear tu cuenta, queremos conocerte un poco — son solo 5 preguntas rápidas, y al final te damos una sugerencia de presupuesto hecha para ti.</div>
-    `;
-  } else if (preAuthIndex>=1 && preAuthIndex<=5){
-    const q = PREAUTH_QUESTIONS[preAuthIndex-1];
     html = `
-      <div class="onb-tag">Pregunta ${preAuthIndex} de 5</div>
-      <div class="onb-title">${q.q}</div>
-      <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;margin-top:14px">
-        ${q.options.map(o=>`<button class="btn ${preAuthAnswers[q.id]===o?'':'secondary'}" onclick="preAuthAnswer('${q.id}', this.dataset.val)" data-val="${escHtml(o)}">${o}${preAuthAnswers[q.id]===o?' ✓':''}</button>`).join('')}
-      </div>
+      <div class="onb-icon">👋</div>
+      <div class="onb-title">${window._replayMode ? 'Repasemos juntos' : '¡Es tu primera vez en RENTAPP!'}</div>
+      <div class="onb-desc">${window._replayMode ? 'Las mismas preguntas de antes, para refrescar tu presupuesto sugerido — luego seguimos directo al tutorial. Puedes cerrar en cualquier momento.' : 'Antes de crear tu cuenta, queremos conocerte un poco — son solo 5 preguntas rápidas, y al final te damos una sugerencia de presupuesto hecha para ti.'}</div>
+      ${questionBlockHtml(PREAUTH_QUESTIONS[0])}
     `;
-  } else if (preAuthIndex===6){
+  } else if (preAuthIndex===1){
+    html = `
+      <div class="onb-tag">Pregunta 2 y 3 de 5</div>
+      ${questionBlockHtml(PREAUTH_QUESTIONS[1])}
+      ${questionBlockHtml(PREAUTH_QUESTIONS[2])}
+    `;
+  } else if (preAuthIndex===2){
+    html = `
+      <div class="onb-tag">Pregunta 4 y 5 de 5</div>
+      ${questionBlockHtml(PREAUTH_QUESTIONS[3])}
+      ${questionBlockHtml(PREAUTH_QUESTIONS[4])}
+    `;
+  } else if (preAuthIndex===3){
     const sugg = suggestedBudgetFromAnswers();
+    const bullets = helpBulletsFor(preAuthAnswers.goal);
     html = `
       <div class="onb-icon">🎯</div>
       <div class="onb-tag">${sugg.label}</div>
@@ -4070,19 +4823,12 @@ function renderPreAuthStep(){
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:360px;margin:14px 0">
         ${sugg.budget.map(b=>`<div class="metric"><div class="metric-label">${b.name}</div><div class="metric-value" style="color:${b.color};font-size:19px">${b.pct}%</div></div>`).join('')}
       </div>
-      <div class="onb-desc">Basado en tus respuestas, esto es un buen punto de partida. Lo vas a poder ajustar con calma ${window._replayMode ? 'en el tutorial' : 'justo después de crear tu cuenta'}.</div>
-    `;
-  } else if (preAuthIndex===7){
-    const bullets = helpBulletsFor(preAuthAnswers.goal);
-    html = `
-      <div class="onb-icon">✨</div>
-      <div class="onb-title">Así te podemos ayudar</div>
-      <div style="text-align:left;width:100%;max-width:360px;margin:10px 0">
-        ${bullets.map(b=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;font-size:13.5px;color:var(--text2);line-height:1.5"><span style="color:var(--accent)">✓</span><span>${b}</span></div>`).join('')}
+      <div class="onb-desc" style="margin-bottom:12px">Basado en tus respuestas — lo vas a poder ajustar con calma ${window._replayMode ? 'en el tutorial' : 'justo después de crear tu cuenta'}.</div>
+      <div style="text-align:left;width:100%;max-width:360px;margin:6px 0">
+        ${bullets.slice(0,2).map(b=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;color:var(--text2);line-height:1.5"><span style="color:var(--accent)">✓</span><span>${b}</span></div>`).join('')}
       </div>
-      <div class="onb-desc">${window._replayMode ? 'Ya tienes tu cuenta — sigamos directo al tutorial con este presupuesto ya aplicado.' : 'Crea tu cuenta gratis para empezar a trabajar en esto — tu presupuesto sugerido ya va incluido.'}</div>
     `;
-  } else if (preAuthIndex===8){
+  } else if (preAuthIndex===4){
     html = `
       ${outsideLogoHtml(.45)}
       <div class="onb-title">Crea tu cuenta gratis</div>
@@ -4092,6 +4838,7 @@ function renderPreAuthStep(){
         <div class="field"><label>Correo electrónico</label><input type="email" id="preAuthEmail" placeholder="tu@correo.com" autocomplete="email"></div>
         <div class="field"><label>Contraseña</label><input type="password" id="preAuthPass" placeholder="mínimo 6 caracteres" autocomplete="new-password"></div>
         <div class="auth-err" id="preAuthErr"></div>
+        <div class="link-row" style="margin-top:6px">✨ <a onclick="closePreAuthDemo(); openShowcase()">Ver qué puedes lograr</a></div>
       </div>
     `;
   }
@@ -4099,21 +4846,21 @@ function renderPreAuthStep(){
   document.getElementById('preAuthDots').innerHTML = Array.from({length:totalSteps},(_,i)=>`<div class="onb-dot ${i===preAuthIndex?'active':''}"></div>`).join('');
   document.getElementById('preAuthBackBtn').classList.toggle('hidden', preAuthIndex===0);
   if (window._replayMode){
-    document.getElementById('preAuthNextBtn').textContent = preAuthIndex===7 ? 'Continuar al tutorial →' : 'Siguiente';
+    document.getElementById('preAuthNextBtn').textContent = preAuthIndex===3 ? 'Continuar al tutorial →' : 'Siguiente';
   } else {
-    document.getElementById('preAuthNextBtn').textContent = preAuthIndex>=7 ? 'Crear cuenta gratis 🚀' : 'Siguiente';
+    document.getElementById('preAuthNextBtn').textContent = preAuthIndex>=3 ? 'Crear cuenta gratis 🚀' : 'Siguiente';
   }
 }
-function preAuthAnswer(id, val){ preAuthAnswers[id]=val; renderPreAuthStep(); setTimeout(preAuthNext, 220); }
+function preAuthAnswer(id, val){ preAuthAnswers[id]=val; renderPreAuthStep(); }
 function preAuthNext(){
-  if (preAuthIndex===7 && window._replayMode){
+  if (preAuthIndex===3 && window._replayMode){
     window._pendingSuggestedBudget = suggestedBudgetFromAnswers();
     document.getElementById('preAuthOverlay').classList.remove('show');
     window._replayMode = false;
     openOnboarding();
     return;
   }
-  if (preAuthIndex < 8){ preAuthIndex++; renderPreAuthStep(); return; }
+  if (preAuthIndex < 4){ preAuthIndex++; renderPreAuthStep(); return; }
   submitPreAuthRegister();
 }
 function preAuthBack(){ if (preAuthIndex>0){ preAuthIndex--; renderPreAuthStep(); } }
@@ -4144,6 +4891,1311 @@ async function submitPreAuthRegister(){
   await afterAuthSuccess(data.user);
 }
 
+/* =======================================================================
+   ATAJOS · AJUSTES RÁPIDOS · MEDALLAS Y NIVELES · STORIES
+   ======================================================================= */
+
+let homeGoalsOpen = false;
+let homeDebtsOpen = false;
+let homeMedalsOpen = false;
+function toggleHomeSection(which){
+  if (which==='goals') homeGoalsOpen = !homeGoalsOpen;
+  if (which==='debts') homeDebtsOpen = !homeDebtsOpen;
+  if (which==='medals') homeMedalsOpen = !homeMedalsOpen;
+  renderHome();
+}
+
+/* Medallas en el dashboard: enfocado en la PRÓXIMA que viene, no en las ya ganadas */
+function nextMedalTargets(n){
+  return allMedalStates()
+    .filter(s=> s.next !== null)
+    .sort((a,b)=> b.pct - a.pct)
+    .slice(0, n||3);
+}
+function homeMedalsSectionHtml(){
+  const L = userLevel();
+  const upcoming = nextMedalTargets(3);
+  const top = upcoming[0];
+  const earned = allMedalStates().filter(s=>s.level>0).length;
+  const sub = top
+    ? `Próxima: ${top.name} — falta ${medalFmt(top, Math.max(0, top.next - top.value))}`
+    : '¡Tienes todas las medallas al máximo! 🎉';
+  return `
+    <div class="card" style="padding:0;margin-bottom:12px;overflow:hidden">
+      <div class="row-between" style="padding:13px 16px;cursor:pointer" onclick="toggleHomeSection('medals')">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <span style="font-size:17px">🎖</span>
+          <div style="min-width:0">
+            <div style="font-size:13.5px;font-weight:700">Medallas · Nivel ${L.level}</div>
+            <div style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(sub)}</div>
+          </div>
+        </div>
+        <span style="font-size:11.5px;color:var(--accent);font-weight:700;white-space:nowrap">${homeMedalsOpen?'Ocultar ▲':'Ver más ▼'}</span>
+      </div>
+      ${homeMedalsOpen ? `<div style="padding:12px 14px;border-top:1px solid var(--border)">
+        <div class="row-between" style="margin-bottom:6px">
+          <span style="font-size:11px;color:var(--text3)">${L.xp.toLocaleString('en-US')} XP · ${earned} desbloqueadas</span>
+          <span style="font-size:11px;color:var(--text3)">Nivel ${L.level+1} en ${Math.max(0,L.next-L.xp).toLocaleString('en-US')} XP</span>
+        </div>
+        <div class="progress-track" style="margin-bottom:14px"><div class="progress-fill" style="width:${L.pct}%"></div></div>
+        <div style="font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--text3);margin-bottom:9px">LO QUE VIENE</div>
+        ${upcoming.length ? upcoming.map(s=>`
+          <div style="display:flex;gap:11px;align-items:center;padding:9px 0;border-top:1px solid var(--border);cursor:pointer" onclick="openMedalDetail('${s.id}')">
+            <div style="flex-shrink:0;color:var(--text3);opacity:${s.level>0?'1':'.5'}">${medalBadgeSvg(s, 40)}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12.5px;font-weight:700;line-height:1.25">${s.name}</div>
+              <div style="font-size:10.5px;color:var(--text3);margin-top:1px">${s.level>0 ? `Ahora: ${s.rank.n} → siguiente ${RANKS[s.level].n}` : `Sin desbloquear → ${RANKS[0].n}`}</div>
+              <div class="progress-track" style="height:5px;margin:6px 0 3px"><div style="height:5px;border-radius:3px;background:var(--accent);width:${s.pct}%;transition:width .8s"></div></div>
+              <div style="font-size:10px;color:var(--text3)">${medalFmt(s,s.value)} de ${medalFmt(s,s.next)} · falta ${medalFmt(s, Math.max(0,s.next-s.value))}</div>
+            </div>
+          </div>`).join('') : ''}
+        <button class="btn small ghost" style="width:100%;margin-top:11px" onclick="openMedalsScreen()">Ver todas mis medallas →</button>
+      </div>` : ''}
+    </div>`;
+}
+
+/* ======================= CONSTRUCTOR DE ATAJOS ======================= */
+const SC_EMOJIS = ['⚡','☕','🍽️','⛽','🛒','🏠','💊','🎬','🐖','🏆','📈','💳','🎁','🚌'];
+let shortcutDraft = null;
+
+function openShortcutBuilder(kind, editId){
+  const existing = editId
+    ? ((kind==='alloc' ? userData.allocShortcuts : userData.txShortcuts)||[]).find(x=>x.id===editId)
+    : null;
+  shortcutDraft = existing
+    ? { ...existing, kind, editId }
+    : (kind==='alloc'
+        ? { kind, emoji:'⚡', targetType:'savings', targetId:null, targetName:'Ahorro general', mode:'all', amount:50 }
+        : { kind, emoji:'⚡', type:'expense', category:null, amount:'', deducible:false, label:'' });
+  renderShortcutBuilder();
+  closeModal('recapModalOverlay');
+  openModal('shortcutBuilderOverlay');
+}
+function scSet(key, val){
+  shortcutDraft[key] = val;
+  if (key==='targetType'){ shortcutDraft.targetId = null; shortcutDraft.targetName = val==='savings' ? 'Ahorro general' : null; }
+  if (key==='type'){ shortcutDraft.category = null; shortcutDraft.investmentId = null; }
+  renderShortcutBuilder();
+}
+function scPickTarget(sel){
+  const opt = sel.options[sel.selectedIndex];
+  shortcutDraft.targetId = sel.value;
+  shortcutDraft.targetName = opt ? opt.dataset.name || opt.textContent.trim() : sel.value;
+}
+function scTargetOptions(){
+  const t = shortcutDraft.targetType;
+  if (t==='goal') return (userData.goals||[]).filter(g=>!g.done).map(g=>({ id:g.id, name:g.name, emoji:g.emoji||'🏆' }));
+  if (t==='debt') return (userData.debts||[]).filter(d=>!d.done).map(d=>({ id:d.id, name:d.name, emoji:'💳' }));
+  if (t==='investment') return (userData.investments||[]).map(i=>({ id:i.id, name:i.name, emoji:'📈' }));
+  if (t==='category') return [...Object.values(CATS.expenseDeducible).flat(), ...Object.values(CATS.expenseNoDeducible).flat()].map(c=>({ id:c, name:c, emoji:'🧾' }));
+  return [];
+}
+function renderShortcutBuilder(){
+  const d = shortcutDraft;
+  const emojiRow = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    ${SC_EMOJIS.map(e=>`<button class="btn ghost" style="width:38px;height:38px;padding:0;font-size:17px;border-radius:12px;${d.emoji===e?'border-color:var(--accent);background:rgba(59,224,207,.12)':''}" onclick="scSet('emoji','${e}')">${e}</button>`).join('')}
+  </div>`;
+
+  if (d.kind==='alloc'){
+    const targets = scTargetOptions();
+    const needsTarget = d.targetType!=='savings';
+    if (needsTarget && !d.targetId && targets.length){ d.targetId = targets[0].id; d.targetName = targets[0].name; }
+    document.getElementById('shortcutBuilderBody').innerHTML = `
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:28px">⚡</div>
+        <div class="modal-title" style="margin-bottom:2px">${d.editId?'Editar atajo':'Nuevo atajo de sobrante'}</div>
+        <div style="font-size:11.5px;color:var(--text3);line-height:1.45">Aparece como botón debajo del "Ingreso sin asignar". Un toque y listo.</div>
+      </div>
+      <div class="sec-title" style="margin-bottom:6px">Ícono</div>
+      ${emojiRow}
+      <div class="sec-title" style="margin-bottom:6px">¿A dónde manda el dinero?</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px">
+        ${[['savings','💰','Ahorro'],['goal','🏆','Meta'],['investment','📈','Inversión'],['debt','💳','Deuda'],['category','🧾','Categoría']].map(([id,ic,lb])=>`
+          <button class="btn ${d.targetType===id?'':'secondary'}" style="height:auto;padding:9px 4px;flex-direction:column;gap:2px;font-size:11px" onclick="scSet('targetType','${id}')">
+            <span style="font-size:15px">${ic}</span>${lb}
+          </button>`).join('')}
+      </div>
+      ${needsTarget ? (targets.length
+        ? `<div class="field"><label>Destino</label><select onchange="scPickTarget(this)">
+            ${targets.map(o=>`<option value="${escHtml(o.id)}" data-name="${escHtml(o.name)}" ${d.targetId===o.id?'selected':''}>${o.emoji} ${escHtml(o.name)}</option>`).join('')}
+          </select></div>`
+        : `<div style="font-size:12px;color:var(--amber);margin-bottom:14px">Todavía no tienes nada aquí. Crea uno primero y vuelve.</div>`) : ''}
+      <div class="sec-title" style="margin-bottom:6px">¿Cuánto manda?</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn ${d.mode==='all'?'':'secondary'}" style="flex:1" onclick="scSet('mode','all')">Todo el sobrante</button>
+        <button class="btn ${d.mode==='fixed'?'':'secondary'}" style="flex:1" onclick="scSet('mode','fixed')">Monto fijo</button>
+      </div>
+      ${d.mode==='fixed' ? `<div class="field"><label>Monto fijo (USD)</label><input type="number" id="scAmount" step="0.01" value="${d.amount||''}" placeholder="50.00"></div>` : `<div style="font-size:11.5px;color:var(--text3);margin-bottom:14px">Enviará el 100% de lo que quede sin asignar en ese momento.</div>`}
+      <button class="btn" onclick="saveShortcut()">${d.editId?'Guardar cambios':'Crear atajo'}</button>
+      ${d.editId?`<button class="btn danger" style="margin-top:9px" onclick="deleteShortcut('alloc','${d.editId}')">🗑 Eliminar atajo</button>`:''}
+      <button class="btn ghost" style="margin-top:9px" onclick="closeModal('shortcutBuilderOverlay')">Cancelar</button>
+    `;
+    return;
+  }
+
+  /* atajo de movimiento */
+  const cats = d.type==='income' ? CATS.income
+    : [...Object.values(CATS.expenseDeducible).flat(), ...Object.values(CATS.expenseNoDeducible).flat()];
+  if (d.type!=='savings' && d.type!=='investment' && !d.category) d.category = topCategoriesFor(d.type,1)[0] || cats[0];
+  const invs = userData.investments || [];
+  if (d.type==='investment' && !d.investmentId && invs.length) d.investmentId = invs[0].id;
+  document.getElementById('shortcutBuilderBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:28px">⚡</div>
+      <div class="modal-title" style="margin-bottom:2px">${d.editId?'Editar atajo':'Nuevo atajo de movimiento'}</div>
+      <div style="font-size:11.5px;color:var(--text3);line-height:1.45">Aparece en el menú del botón ＋. Un toque lo registra completo.</div>
+    </div>
+    <div class="sec-title" style="margin-bottom:6px">Ícono</div>
+    ${emojiRow}
+    <div class="seg" style="margin-bottom:14px">
+      <button class="${d.type==='income'?'active inc':'inc'}" style="font-size:12px;padding:9px 4px" onclick="scSet('type','income')">Ingreso</button>
+      <button class="${d.type==='expense'?'active exp':'exp'}" style="font-size:12px;padding:9px 4px" onclick="scSet('type','expense')">Gasto</button>
+      <button class="${d.type==='investment'?'active neutral':'neutral'}" style="font-size:12px;padding:9px 4px" onclick="scSet('type','investment')">Inversión</button>
+      <button class="${d.type==='savings'?'active neutral':'neutral'}" style="font-size:12px;padding:9px 4px" onclick="scSet('type','savings')">Ahorro</button>
+    </div>
+    ${d.type==='income'||d.type==='expense' ? `<div class="field"><label>Categoría</label><select id="scCat">
+      ${cats.map(c=>`<option value="${escHtml(c)}" ${d.category===c?'selected':''}>${escHtml(c)}</option>`).join('')}
+    </select></div>` : ''}
+    ${d.type==='investment' ? (invs.length
+      ? `<div class="field"><label>Categoría de inversión</label><select id="scInvCat">
+          ${invs.map(c=>`<option value="${escHtml(c.id)}" data-name="${escHtml(c.name)}" ${d.investmentId===c.id?'selected':''}>📈 ${escHtml(c.name)}</option>`).join('')}
+        </select></div>`
+      : `<div style="font-size:12px;color:var(--amber);margin-bottom:14px">Aún no tienes categorías de inversión. Crea una desde el botón ＋ → Inversión y vuelve.</div>`) : ''}
+    <div class="field"><label>Monto (USD)</label><input type="number" id="scAmount" step="0.01" value="${d.amount||''}" placeholder="4.50"></div>
+    ${d.type==='expense' ? `<label class="chk-row" style="cursor:pointer"><input type="checkbox" id="scDeducible" ${d.deducible?'checked':''}><span>Es deducible según DGI</span></label>` : ''}
+    <div class="field"><label>Nombre corto (opcional)</label><input type="text" id="scLabel" value="${escHtml(d.label||'')}" placeholder="ej. Café de la mañana" maxlength="24"></div>
+    <button class="btn" onclick="saveShortcut()">${d.editId?'Guardar cambios':'Crear atajo'}</button>
+    ${d.editId?`<button class="btn danger" style="margin-top:9px" onclick="deleteShortcut('tx','${d.editId}')">🗑 Eliminar atajo</button>`:''}
+    <button class="btn ghost" style="margin-top:9px" onclick="closeModal('shortcutBuilderOverlay')">Cancelar</button>
+  `;
+}
+function saveShortcut(){
+  const d = shortcutDraft;
+  const amtEl = document.getElementById('scAmount');
+  const amount = amtEl ? parseFloat(amtEl.value) : 0;
+
+  if (d.kind==='alloc'){
+    if (d.targetType!=='savings' && !d.targetId){ showToast('Elige un destino'); return; }
+    if (d.mode==='fixed' && (!amount || amount<=0)){ showToast('Escribe un monto fijo válido'); return; }
+    const sc = {
+      id: d.editId || 'asc-'+Math.random().toString(36).slice(2,9),
+      emoji: d.emoji, targetType: d.targetType, targetId: d.targetId,
+      targetName: d.targetType==='savings' ? 'Ahorro general' : d.targetName,
+      mode: d.mode, amount: d.mode==='fixed' ? amount : 0
+    };
+    userData.allocShortcuts = userData.allocShortcuts || [];
+    const i = userData.allocShortcuts.findIndex(x=>x.id===sc.id);
+    if (i>=0) userData.allocShortcuts[i] = sc; else userData.allocShortcuts.push(sc);
+  } else {
+    if (!amount || amount<=0){ showToast('Escribe un monto válido'); return; }
+    const catEl = document.getElementById('scCat');
+    const invEl = document.getElementById('scInvCat');
+    if (d.type==='investment' && !invEl){ showToast('Primero crea una categoría de inversión'); return; }
+    const sc = {
+      id: d.editId || 'tsc-'+Math.random().toString(36).slice(2,9),
+      emoji: d.emoji, type: d.type,
+      category: d.type==='savings' ? 'Ahorro general'
+              : d.type==='investment' ? (invEl.options[invEl.selectedIndex].dataset.name || 'Inversión')
+              : (catEl ? catEl.value : d.category),
+      investmentId: d.type==='investment' ? invEl.value : null,
+      amount,
+      deducible: !!(document.getElementById('scDeducible')||{}).checked,
+      label: (document.getElementById('scLabel').value||'').trim()
+    };
+    if (!sc.label) sc.label = sc.category.length>18 ? sc.category.slice(0,18)+'…' : sc.category;
+    userData.txShortcuts = userData.txShortcuts || [];
+    const i = userData.txShortcuts.findIndex(x=>x.id===sc.id);
+    if (i>=0) userData.txShortcuts[i] = sc; else userData.txShortcuts.push(sc);
+  }
+  persistUserState();
+  closeModal('shortcutBuilderOverlay');
+  showToast(d.editId ? 'Atajo actualizado ⚡' : 'Atajo creado ⚡');
+  renderActiveTab();
+}
+function deleteShortcut(kind, id){
+  if (kind==='alloc') userData.allocShortcuts = (userData.allocShortcuts||[]).filter(x=>x.id!==id);
+  else userData.txShortcuts = (userData.txShortcuts||[]).filter(x=>x.id!==id);
+  persistUserState();
+  closeModal('shortcutBuilderOverlay');
+  showToast('Atajo eliminado');
+  renderActiveTab();
+}
+
+/* ======================= AJUSTES RÁPIDOS ======================= */
+function openQuickSettings(){
+  const theme = userData.themeMode || 'dark';
+  const alloc = userData.allocShortcuts || [];
+  const txsc = userData.txShortcuts || [];
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:28px">⚙️</div>
+      <div class="modal-title" style="margin-bottom:2px">Ajustes rápidos</div>
+    </div>
+    <div class="sec-title" style="margin-bottom:6px">Apariencia</div>
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      <button class="btn ${theme==='dark'?'':'secondary'}" style="flex:1" onclick="quickTheme('dark')">🌙 Oscuro</button>
+      <button class="btn ${theme==='light'?'':'secondary'}" style="flex:1" onclick="quickTheme('light')">☀️ Claro</button>
+    </div>
+
+    <div class="row-between" style="margin-bottom:6px">
+      <div class="sec-title" style="margin-bottom:0">Atajos del botón ＋</div>
+      <button class="btn small ghost" style="width:auto;height:auto;padding:5px 10px;font-size:11px" onclick="openShortcutBuilder('tx')">＋ Nuevo</button>
+    </div>
+    <div class="card" style="padding:4px 12px;margin-bottom:16px">
+      ${txsc.length ? txsc.map(sc=>`
+        <div class="card-list-item" style="cursor:pointer" onclick="openShortcutBuilder('tx','${sc.id}')">
+          <div class="tx-ic" style="background:rgba(var(--ink-rgb),.07)">${sc.emoji||'⚡'}</div>
+          <div class="tx-info"><div class="tx-name">${escHtml(sc.label||sc.category)}</div><div class="tx-meta">${sc.type==='income'?'Ingreso':sc.type==='savings'?'Ahorro':sc.type==='investment'?'Inversión':'Gasto'} · ${escHtml(sc.category)}</div></div>
+          <div class="tx-amt">${fmt(sc.amount)}</div>
+        </div>`).join('')
+      : `<div class="empty-state" style="padding:14px"><div class="t">Sin atajos todavía. Crea uno para tus movimientos de siempre.</div></div>`}
+    </div>
+
+    <div class="row-between" style="margin-bottom:6px">
+      <div class="sec-title" style="margin-bottom:0">Atajos del sobrante</div>
+      <button class="btn small ghost" style="width:auto;height:auto;padding:5px 10px;font-size:11px" onclick="openShortcutBuilder('alloc')">＋ Nuevo</button>
+    </div>
+    <div class="card" style="padding:4px 12px;margin-bottom:16px">
+      ${alloc.length ? alloc.map(sc=>`
+        <div class="card-list-item" style="cursor:pointer" onclick="openShortcutBuilder('alloc','${sc.id}')">
+          <div class="tx-ic" style="background:rgba(var(--ink-rgb),.07)">${sc.emoji||'⚡'}</div>
+          <div class="tx-info"><div class="tx-name">${escHtml(sc.targetName||'Ahorro general')}</div><div class="tx-meta">${sc.mode==='all'?'Todo el sobrante':'Monto fijo'}</div></div>
+          <div class="tx-amt">${sc.mode==='all'?'Todo':fmt(sc.amount)}</div>
+        </div>`).join('')
+      : `<div class="empty-state" style="padding:14px"><div class="t">Sin atajos. Crea uno para vaciar tu "sin asignar" de un toque.</div></div>`}
+    </div>
+
+    <button class="btn ghost" onclick="closeModal('recapModalOverlay'); openColorPicker()">🎨 Más personalización</button>
+    <button class="btn ghost" style="margin-top:9px" onclick="closeModal('recapModalOverlay'); openOnboarding()">❓ Ver el tutorial</button>
+  `;
+  openModal('recapModalOverlay');
+}
+function quickTheme(mode){
+  userData.themeMode = mode;
+  applyThemeMode(mode);
+  persistSetting({ theme_mode: mode });
+  openQuickSettings();
+  renderActiveTab();
+  showToast(mode==='light' ? 'Modo claro ☀️' : 'Modo oscuro 🌙');
+}
+
+/* ======================= INVITA Y GANA (REFERIDOS) =======================
+   Diseño anti-abuso: la recompensa de un referido solo se otorga cuando esa
+   persona completa su Despegue al 100% — y el Despegue ahora exige una racha
+   REAL de 7 días (ver milestone 'realStreak' arriba). Eso hace que "crear
+   cuentas falsas" para autoreferirse cueste una semana de tiempo real por
+   cuenta, no un clic. En producción esto se refuerza en el backend con dos
+   capas más que no viven en este archivo cliente:
+   1) La fecha de cada check-in de racha la pone el servidor (now() en
+      Supabase), nunca el valor que manda el cliente — si no, la racha de 7
+      días se falsea editando la fecha localmente.
+   2) Un webhook/Edge Function acredita al referidor SOLO cuando el registro
+      del referido pasa a 100% en la base de datos (fuente de verdad), y
+      aplica límites por IP/dispositivo/dominio de correo antes de pagar la
+      recompensa — el cliente jamás debe ser quien decide si se paga o no.
+   ======================================================================= */
+const REFERRAL_DAYS_PER_FRIEND   = 3;   /* días de Premium por cada amigo que completa su Despegue */
+const REFERRAL_MAX_PER_MONTH     = 4;   /* tope de recompensas acreditadas por mes calendario */
+const REFERRAL_MAX_TOTAL_DAYS    = 60;  /* tope acumulado de días ganados por referidos */
+const REFERRED_BONUS_DAYS        = 3;   /* días extra para el AMIGO al completar su Despegue */
+const REFERRED_STORY_UNLOCK_DAYS = 30;  /* a los 30 días de cuenta, el amigo desbloquea una story de cortesía */
+
+function monthKeyNow(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+
+function ensureReferralCode(){
+  if (userData.referralCode) return userData.referralCode;
+  const base = (currentUser && currentUser.id ? currentUser.id : Math.random().toString(36)).replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  const code = 'RENTAPP-' + (base.slice(0,5) || 'AMIGO') + Math.floor(10+Math.random()*89);
+  userData.referralCode = code;
+  persistSetting({ referral_code: code });
+  return code;
+}
+function referralLinkFor(code){ return `https://rentapp.app/r/${code}`; }
+
+/* --- contadores --- */
+function referralsCompleted(){ return (userData.referrals||[]).filter(r=>r.completed).length; }
+function referralsRewardedThisMonth(){
+  const mk = monthKeyNow();
+  return (userData.referrals||[]).filter(r=>r.rewarded && r.rewardMonth===mk).length;
+}
+function referralsQueued(){ return (userData.referrals||[]).filter(r=>r.completed && !r.rewarded).length; }
+function referralDaysEarned(){ return (userData.referrals||[]).filter(r=>r.rewarded).length * REFERRAL_DAYS_PER_FRIEND; }
+function referralSlotsLeft(){ return Math.max(0, REFERRAL_MAX_PER_MONTH - referralsRewardedThisMonth()); }
+
+function referralStatusMeta(r){
+  if (r.rewarded) return { label:`Completado · +${REFERRAL_DAYS_PER_FRIEND} días para ti`, color:'var(--accent)', icon:'✅' };
+  if (r.completed) return { label:'Completado · en cola para el próximo mes', color:'var(--purple)', icon:'⏳' };
+  if (r.streakDays>=1) return { label:`Usando la app: ${r.streakDays}/7 días`, color:'var(--amber)', icon:'🔥' };
+  return { label:'Invitado — aún no empieza su Despegue', color:'var(--text3)', icon:'📨' };
+}
+
+/* --- acreditación: respeta tope mensual y tope total, lo demás queda en cola --- */
+function markReferralCompleted(referralId){
+  const r = (userData.referrals||[]).find(x=>x.id===referralId);
+  if (!r || r.completed) return;
+  /* El servidor es quien valida esto de verdad (ver Edge Function en la
+     migración SQL): aquí solo evitamos pintar como completo a alguien que
+     todavía no verificó su correo. */
+  if (r.emailVerified === false) return;
+  r.completed = true;
+  r.completedAt = new Date().toISOString();
+  persistUserState();
+  pushNotif('medal', `${r.name} completó su Despegue`, 'Tu invitado ya usa RENTAPP de verdad', '🤝');
+  processReferralQueue();
+  checkMedalUnlocks();
+}
+function processReferralQueue(){
+  const queue = (userData.referrals||[]).filter(r=>r.completed && !r.rewarded)
+    .sort((a,b)=> new Date(a.completedAt||0) - new Date(b.completedAt||0));
+  let credited = 0;
+  for (const r of queue){
+    if (referralSlotsLeft() <= 0) break;
+    if (referralDaysEarned() >= REFERRAL_MAX_TOTAL_DAYS) break;
+    r.rewarded = true;
+    r.rewardMonth = monthKeyNow();
+    r.rewardedAt = new Date().toISOString();
+    extendPremiumDays(REFERRAL_DAYS_PER_FRIEND);
+    credited++;
+  }
+  if (credited){
+    showToast(`🎁 +${credited*REFERRAL_DAYS_PER_FRIEND} días de Premium por tus invitados`);
+    pushNotif('medal', `+${credited*REFERRAL_DAYS_PER_FRIEND} días de Premium`, 'Recompensa por invitar amigos', '🎁');
+  }
+  return credited;
+}
+function extendPremiumDays(days){
+  const base = (userData.trialEndsAt && new Date(userData.trialEndsAt) > new Date())
+    ? new Date(userData.trialEndsAt) : new Date();
+  base.setDate(base.getDate() + days);
+  userData.trialEndsAt = base.toISOString();
+  if (userData.tier === 'free') userData.tier = 'trial';
+  persistSetting({ tier: userData.tier, trial_ends_at: userData.trialEndsAt });
+}
+
+/* --- lado del AMIGO invitado (doble vía) --- */
+function accountAgeDays(){
+  const first = (userData.checkins||[]).slice().sort()[0];
+  if (!first) return 0;
+  return Math.floor((new Date() - new Date(first+'T00:00:00')) / 86400000);
+}
+function referredBonusEligible(){ return !!userData.referredBy && !userData.referredBonusClaimed; }
+function claimReferredBonus(){
+  if (!referredBonusEligible()) return;
+  userData.referredBonusClaimed = true;
+  extendPremiumDays(REFERRED_BONUS_DAYS);
+  pushNotif('medal', `+${REFERRED_BONUS_DAYS} días extra de Premium`, 'Bono por entrar con una invitación', '🎁');
+}
+function referredStoryUnlockReady(){
+  return !!userData.referredBy && !userData.referredStoryClaimed && accountAgeDays() >= REFERRED_STORY_UNLOCK_DAYS;
+}
+function claimReferredStory(){
+  if (!referredStoryUnlockReady()) return;
+  userData.referredStoryClaimed = true;
+  pushNotif('medal', 'Story de cortesía desbloqueada', 'Tu primer mes completo, analizado a fondo', '✨');
+  openStories('month');
+}
+
+function openReferralScreen(){
+  ensureReferralCode();
+  const code = userData.referralCode;
+  const refs = userData.referrals || [];
+  const daysEarned = referralDaysEarned();
+  const thisMonth = referralsRewardedThisMonth();
+  const queued = referralsQueued();
+  const atTotalCap = daysEarned >= REFERRAL_MAX_TOTAL_DAYS;
+  const pending = refs.filter(r=>!r.completed);
+
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:30px">🎁</div>
+      <div class="modal-title" style="margin-bottom:2px">Invita y gana Premium</div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.5;max-width:330px;margin:0 auto">
+        Ganas <b style="color:var(--accent)">${REFERRAL_DAYS_PER_FRIEND} días de Premium</b> por cada amigo que complete su Despegue. Y tu amigo también gana: <b style="color:var(--accent)">${REFERRED_BONUS_DAYS} días extra</b> y una story de cortesía a su primer mes.
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Tu código</div>
+      <div style="font-size:19px;font-weight:800;letter-spacing:.04em;color:var(--accent);margin-bottom:10px">${code}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn small" style="flex:1" onclick="shareReferralCode()">📤 Compartir</button>
+        <button class="btn small ghost" style="flex:1" onclick="copyReferralLink()">📋 Copiar</button>
+      </div>
+    </div>
+
+    <div class="metric-grid" style="margin-bottom:12px">
+      <div class="metric"><div class="metric-label">Completaron</div><div class="metric-value" style="font-size:18px">${referralsCompleted()}</div></div>
+      <div class="metric"><div class="metric-label">Días ganados</div><div class="metric-value" style="font-size:18px;color:var(--accent)">${daysEarned}</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;padding:12px 14px">
+      <div class="row-between" style="margin-bottom:7px">
+        <span style="font-size:12px;font-weight:700">Recompensas de este mes</span>
+        <span style="font-size:12px;font-weight:800;color:${referralSlotsLeft()?'var(--accent)':'var(--amber)'}">${thisMonth} de ${REFERRAL_MAX_PER_MONTH}</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${Math.round(thisMonth/REFERRAL_MAX_PER_MONTH*100)}%"></div></div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:8px">
+        ${queued
+          ? `Tienes <b style="color:var(--purple)">${queued} ${queued===1?'invitado':'invitados'} en cola</b>. No se pierden: se acreditan automáticamente el mes que viene, y ya cuentan para tu medalla.`
+          : `Puedes ganar hasta ${REFERRAL_MAX_PER_MONTH} recompensas al mes. Si traes más, quedan en cola para el mes siguiente — nunca se pierden.`}
+      </div>
+      ${atTotalCap ? `<div style="font-size:11px;color:var(--amber);margin-top:8px">Llegaste al tope de ${REFERRAL_MAX_TOTAL_DAYS} días acumulados por referidos. Tus invitados siguen contando para tu medalla y tus cosméticos.</div>` : ''}
+    </div>
+
+    ${referredStoryUnlockReady() ? `
+      <div class="card" style="margin-bottom:14px;border-color:var(--purple);background:linear-gradient(135deg,rgba(139,127,245,.16),rgba(59,224,207,.08))">
+        <div style="font-size:13px;font-weight:800;margin-bottom:4px">✨ Tu story de cortesía está lista</div>
+        <div style="font-size:11.5px;color:var(--text2);line-height:1.5;margin-bottom:10px">Cumpliste tu primer mes. Te toca un análisis completo, cortesía de quien te invitó.</div>
+        <button class="btn" onclick="claimReferredStory()">Ver mi story ✨</button>
+      </div>` : ''}
+
+    <div class="sec-title">Tus invitados</div>
+    <div class="card" style="padding:4px 12px;margin-bottom:14px">
+      ${refs.length ? refs.slice().sort((a,b)=> (b.rewarded-a.rewarded) || (b.completed-a.completed) || (b.streakDays-a.streakDays)).map(r=>{
+        const meta = referralStatusMeta(r);
+        return `<div class="card-list-item">
+          <div class="tx-ic" style="background:rgba(var(--ink-rgb),.07)">${r.emoji||'👤'}</div>
+          <div class="tx-info"><div class="tx-name">${escHtml(r.name)}</div><div class="tx-meta" style="color:${meta.color}">${meta.icon} ${meta.label}</div></div>
+        </div>`;
+      }).join('') : `<div class="empty-state" style="padding:16px"><div class="t">Aún no has invitado a nadie — comparte tu código para empezar.</div></div>`}
+    </div>
+
+    <div style="font-size:11px;color:var(--text3);line-height:1.5;background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:14px">
+      💡 La recompensa se acredita cuando tu amigo verifica su correo y usa la app de verdad durante 7 días seguidos — no basta con registrarse, así que crear cuentas para autoreferirse no sirve de nada.
+    </div>
+
+    <button class="btn ghost" onclick="openRewardsCatalog()">🏅 Ver todo lo que puedo desbloquear →</button>
+
+  `;
+  openModal('recapModalOverlay');
+}
+
+function copyReferralLink(){
+  const link = referralLinkFor(ensureReferralCode());
+  if (!navigator.clipboard || !navigator.clipboard.writeText){ showToast('Copia manualmente: '+link); return; }
+  navigator.clipboard.writeText(link).then(
+    ()=> showToast('Enlace copiado 📋'),
+    ()=> showToast('No se pudo copiar')
+  );
+}
+function shareReferralCode(){
+  const code = ensureReferralCode();
+  shareText('Únete a RENTAPP',
+    `Llevo mis finanzas al día con RENTAPP 🇵🇦 — únete con mi código y ambos ganamos días de Premium.\nCódigo: ${code}\n${referralLinkFor(code)}`);
+}
+
+/* ======================= MEDALLAS, XP Y NIVELES ======================= */
+const RANKS = [
+  { n:'Cabo',     c1:'#E0B183', c2:'#A8703E', ring:'#C08A52' },
+  { n:'Sargento', c1:'#EEF2F6', c2:'#9AA3AE', ring:'#C9D1D9' },
+  { n:'Teniente', c1:'#FFDE86', c2:'#C08C15', ring:'#F0C24A' },
+  { n:'Capitán',  c1:'#DFF6FF', c2:'#5EA9C4', ring:'#9FE7E0' },
+  { n:'General',  c1:'#CFEBFF', c2:'#5A8FE6', ring:'#8FD0FF' }
+];
+const LEVEL_TITLES = [
+  'Recluta del Ahorro','Cabo del Bolsillo','Sargento del Presupuesto','Sargento Mayor',
+  'Teniente del Capital','Capitán de Caudales','Comandante de Cartera','Coronel del Patrimonio',
+  'General de Finanzas','Mariscal Mogul'
+];
+
+function monthKeysWithData(){
+  const set = new Set();
+  (userData.transactions||[]).forEach(t=> set.add(t.date.slice(0,7)));
+  return [...set].sort();
+}
+function monthStats(key){
+  const y = parseInt(key.slice(0,4)), m = parseInt(key.slice(5,7));
+  const txs = getTxs(y,m);
+  const income = sum(txs,['income']);
+  const spent = bucketSpentInMonthOf(y,m);
+  return { y, m, income, spent, txs };
+}
+function budgetTargetFor(name, income){
+  const b = (userData.budget||[]).find(x=>x.name===name);
+  return b ? income * b.pct/100 : 0;
+}
+
+const MEDALS = [
+  { id:'budget', name:'Mogul del Presupuesto', emoji:'🎯',
+    desc:'Meses en los que ni Necesidades ni Deseos se pasaron de su meta.',
+    steps:[1,3,6,12,24],
+    measure(){ let n=0; monthKeysWithData().forEach(k=>{ const s=monthStats(k); if(s.income<=0) return;
+      const okN = s.spent.Necesidades <= budgetTargetFor('Necesidades', s.income)+0.01;
+      const okD = s.spent.Deseos <= budgetTargetFor('Deseos', s.income)+0.01;
+      if (okN && okD) n++; }); return n; } },
+  { id:'wants', name:'Barón de los Deseos', emoji:'🍸',
+    desc:'Meses gastando menos de lo presupuestado en Deseos.',
+    steps:[1,3,6,12,24],
+    measure(){ let n=0; monthKeysWithData().forEach(k=>{ const s=monthStats(k); if(s.income<=0) return;
+      const t = budgetTargetFor('Deseos', s.income);
+      if (t>0 && s.spent.Deseos < t*0.9) n++; }); return n; } },
+  { id:'income', name:'Magnate en Ascenso', emoji:'📊',
+    desc:'Meses en los que tu ingreso superó al del mes anterior.',
+    steps:[1,3,6,12,18],
+    measure(){ const keys = monthKeysWithData(); let n=0;
+      for (let i=1;i<keys.length;i++){ if (monthStats(keys[i]).income > monthStats(keys[i-1]).income) n++; }
+      return n; } },
+  { id:'needs', name:'Tesorero de Precisión', emoji:'🎚️',
+    desc:'Meses cerrando Necesidades dentro del ±10% de tu meta — ni de más ni de menos.',
+    steps:[1,3,6,12,18],
+    measure(){ let n=0; monthKeysWithData().forEach(k=>{ const s=monthStats(k); const t=budgetTargetFor('Necesidades', s.income);
+      if (t>0 && Math.abs(s.spent.Necesidades - t) <= t*0.10) n++; }); return n; } },
+  { id:'goals', name:'Cazafortunas', emoji:'🏆',
+    desc:'Metas cumplidas de $1,000 o más.',
+    steps:[1,2,4,8,15],
+    measure(){ return (userData.goals||[]).filter(g=>{
+      const saved=(g.deposits||[]).reduce((a,d)=>a+d.amount,0);
+      return g.target>=1000 && (g.done || saved>=g.target); }).length; } },
+  { id:'invest', name:'Bróker de Acero', emoji:'📈',
+    desc:'Meses distintos en los que invertiste al menos una vez.',
+    steps:[1,3,6,12,24],
+    measure(){ const set=new Set();
+      (userData.investments||[]).forEach(i=>(i.deposits||[]).forEach(d=>set.add(d.date.slice(0,7))));
+      return set.size; } },
+  { id:'streak', name:'Centinela del Bolsillo', emoji:'🔥',
+    desc:'Tu racha de días registrando movimientos.',
+    steps:[3,7,30,90,180],
+    measure(){ return computeStreak(); } },
+  { id:'savings', name:'Bóveda Blindada', emoji:'🏦',
+    desc:'Total acumulado entre metas y ahorro general.',
+    money:true, steps:[250,1000,5000,15000,50000],
+    measure(){ const g=(userData.goals||[]).reduce((a,x)=>a+(x.deposits||[]).reduce((s,d)=>s+d.amount,0),0);
+      const gen=((userData.generalSavings||{}).deposits||[]).reduce((a,d)=>a+d.amount,0);
+      return g+gen; } },
+  { id:'debts', name:'Verdugo de Deudas', emoji:'⚔️',
+    desc:'Total abonado a tus deudas.',
+    money:true, steps:[100,500,2000,7500,20000],
+    measure(){ return (userData.debts||[]).reduce((a,d)=>a+(d.payments||[]).reduce((s,p)=>s+p.amount,0),0); } },
+  { id:'deduc', name:'Escribano Fiscal', emoji:'🧾',
+    desc:'Gastos deducibles registrados con su categoría DGI.',
+    steps:[5,20,50,120,300],
+    measure(){ return (userData.transactions||[]).filter(t=>t.type==='expense' && t.deducible).length; } },
+  { id:'referrals', name:'Embajador de Fortunas', emoji:'🤝',
+    desc:'Amigos que invitaste y completaron su Despegue usando la app 7 días seguidos.',
+    steps:[1,3,6,12,25],
+    measure(){ return referralsCompleted(); } },
+  { id:'assign', name:'Rey del Sobrante', emoji:'👑',
+    desc:'Meses en los que dejaste tu "sin asignar" prácticamente en cero.',
+    steps:[1,3,6,12,24],
+    measure(){ let n=0; monthKeysWithData().forEach(k=>{ const s=monthStats(k); if(s.income<=0) return;
+      const u = unassignedAmount(s.income, s.spent);
+      if (u <= s.income*0.02) n++; }); return n; } }
+];
+
+function medalState(m){
+  const v = m.measure() || 0;
+  let level = 0;
+  for (let i=0;i<m.steps.length;i++){ if (v >= m.steps[i]) level = i+1; }
+  const next = level < m.steps.length ? m.steps[level] : null;
+  const prev = level>0 ? m.steps[level-1] : 0;
+  const pct = next ? Math.min(100, Math.round((v-prev)/(next-prev)*100)) : 100;
+  return { ...m, value:v, level, next, pct, rank: level>0 ? RANKS[level-1] : null };
+}
+function allMedalStates(){ return MEDALS.map(medalState); }
+function medalFmt(m, v){ return m.money ? fmt(v) : String(Math.round(v)); }
+
+function totalXp(){
+  const fromMedals = allMedalStates().reduce((a,s)=> a + (s.level*(s.level+1)/2)*80, 0);
+  const fromTx = Math.min(3000, (userData.transactions||[]).length*6);
+  return Math.round(fromMedals + fromTx + (userData.xpBonus||0));
+}
+function xpForLevel(n){ return 60*Math.pow(n-1,2); }
+function userLevel(){
+  const xp = totalXp();
+  let lvl = 1;
+  while (lvl < 60 && xp >= xpForLevel(lvl+1)) lvl++;
+  return { level:lvl, xp, cur:xpForLevel(lvl), next:xpForLevel(lvl+1),
+    title: LEVEL_TITLES[Math.min(LEVEL_TITLES.length-1, Math.floor((lvl-1)/2))],
+    pct: Math.min(100, Math.round((xp - xpForLevel(lvl)) / Math.max(1, xpForLevel(lvl+1)-xpForLevel(lvl)) * 100)) };
+}
+function awardXp(n, reason){
+  userData.xpBonus = (userData.xpBonus||0) + n;
+  persistUserState();
+}
+function levelChipHtml(){
+  const L = userLevel();
+  return `<button class="btn small ghost" style="width:auto;height:auto;padding:5px 10px;border-radius:999px;font-size:11px;white-space:nowrap;border-color:var(--accent);color:var(--accent)" onclick="openMedalsScreen()">🎖 Nv. ${L.level}</button>`;
+}
+
+/* --- insignia estilo rango militar --- */
+let _badgeUid = 0;
+function medalBadgeSvg(state, size){
+  const uid = 'mb'+(_badgeUid++);
+  const s = size || 66;
+  const r = state.rank;
+  if (!r){
+    return `<svg width="${s}" height="${s*1.18}" viewBox="0 0 64 76" style="opacity:.42">
+      <path d="M32 6 L56 17 V40 C56 55 45 65 32 71 C19 65 8 55 8 40 V17 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-dasharray="5 4"/>
+      <text x="32" y="45" text-anchor="middle" font-size="22" opacity=".8">🔒</text>
+    </svg>`;
+  }
+  const chevrons = Array.from({length:state.level},(_,i)=>
+    `<path d="M18 ${60-i*6.4} L32 ${54.5-i*6.4} L46 ${60-i*6.4}" fill="none" stroke="${r.c2}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>`
+  ).join('');
+  const stars = state.level>=4 ? `<path d="M32 12.5 l1.9 4 4.4.6-3.2 3.1.8 4.4-3.9-2.1-3.9 2.1.8-4.4-3.2-3.1 4.4-.6z" fill="${r.c1}" stroke="${r.c2}" stroke-width=".6"/>` : '';
+  return `<svg width="${s}" height="${s*1.18}" viewBox="0 0 64 76">
+    <defs>
+      <linearGradient id="${uid}" x1="0" y1="0" x2="0.6" y2="1">
+        <stop offset="0%" stop-color="${r.c1}"/><stop offset="100%" stop-color="${r.c2}"/>
+      </linearGradient>
+      <linearGradient id="${uid}r" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${r.c2}"/><stop offset="100%" stop-color="${r.c1}"/>
+      </linearGradient>
+    </defs>
+    <path d="M22 0 h20 l-3.5 11 h-13 z" fill="url(#${uid}r)" opacity=".9"/>
+    <path d="M32 6 L56 17 V40 C56 55 45 65 32 71 C19 65 8 55 8 40 V17 Z" fill="url(#${uid})" stroke="${r.ring}" stroke-width="2"/>
+    <path d="M32 11 L51 19.5 V40 C51 52 42 60.5 32 65.5 C22 60.5 13 52 13 40 V19.5 Z" fill="rgba(0,0,0,.16)"/>
+    ${stars}
+    <text x="32" y="${state.level>=4?41:37}" text-anchor="middle" font-size="19">${state.emoji}</text>
+    ${chevrons}
+  </svg>`;
+}
+
+function medalCardHtml(state, compact){
+  const locked = state.level===0;
+  return `<div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 14px;margin-bottom:9px;${locked?'opacity:.72':''};cursor:pointer" onclick="openMedalDetail('${state.id}')">
+    <div style="flex-shrink:0;color:var(--text3)">${medalBadgeSvg(state, compact?52:60)}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13.5px;font-weight:800;line-height:1.25">${state.name}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${locked ? 'Bloqueada' : `${state.rank.n} · nivel ${state.level}/5`}</div>
+      <div class="progress-track" style="height:5px;margin:7px 0 4px"><div style="height:5px;border-radius:3px;background:${locked?'var(--surface3)':'var(--accent)'};width:${state.pct}%;transition:width .8s"></div></div>
+      <div style="font-size:10.5px;color:var(--text3)">${state.next ? `${medalFmt(state,state.value)} de ${medalFmt(state,state.next)} para el siguiente rango` : '¡Rango máximo alcanzado! 🎉'}</div>
+    </div>
+  </div>`;
+}
+
+function openMedalsScreen(){
+  const L = userLevel();
+  const states = allMedalStates().sort((a,b)=> b.level-a.level || b.pct-a.pct);
+  const earned = states.filter(s=>s.level>0).length;
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:30px">🎖</div>
+      <div class="modal-title" style="margin-bottom:2px">Nivel ${L.level} · ${L.title}</div>
+      <div style="font-size:11.5px;color:var(--text3)">${earned} de ${states.length} medallas desbloqueadas</div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="row-between" style="margin-bottom:7px">
+        <span style="font-size:12px;color:var(--text2);font-weight:700">${L.xp.toLocaleString('en-US')} XP</span>
+        <span style="font-size:11px;color:var(--text3)">${Math.max(0, L.next-L.xp).toLocaleString('en-US')} XP para el nivel ${L.level+1}</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${L.pct}%"></div></div>
+      <div style="display:flex;gap:8px;margin-top:11px">
+        <button class="btn small ghost" style="flex:1" onclick="shareLevel()">📤 Compartir</button>
+        <button class="btn small" style="flex:1" onclick="openRewardsCatalog()">🏅 Recompensas</button>
+      </div>
+    </div>
+    <div class="sec-title">Tus medallas</div>
+    ${states.map(s=>medalCardHtml(s,true)).join('')}
+  `;
+  openModal('recapModalOverlay');
+}
+function openMedalDetail(id){
+  const s = medalState(MEDALS.find(m=>m.id===id));
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:center;color:var(--text3)">${medalBadgeSvg(s, 96)}</div>
+      <div class="modal-title" style="margin:10px 0 2px">${s.name}</div>
+      <div style="font-size:12px;color:${s.rank?'var(--accent)':'var(--text3)'};font-weight:700">${s.rank ? `${s.rank.n} · nivel ${s.level} de 5` : 'Aún bloqueada'}</div>
+    </div>
+    <div style="font-size:12.5px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:16px">${s.desc}</div>
+    <div class="card" style="padding:6px 14px;margin-bottom:14px">
+      ${s.steps.map((step,i)=>{
+        const got = s.level>=i+1;
+        return `<div class="card-list-item">
+          <div class="tx-ic" style="background:${got?'rgba(59,224,207,.15)':'var(--surface3)'};color:${got?'var(--accent)':'var(--text3)'}">${got?'✓':i+1}</div>
+          <div class="tx-info"><div class="tx-name" style="color:${got?'var(--text)':'var(--text3)'}">${RANKS[i].n}</div><div class="tx-meta">${medalFmt(s,step)}</div></div>
+          ${got?`<div class="tx-amt" style="color:var(--accent);font-size:12px">Logrado</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:14px">Vas en <b style="color:var(--text)">${medalFmt(s,s.value)}</b>${s.next?` — te faltan ${medalFmt(s, Math.max(0,s.next-s.value))}`:''}</div>
+    ${s.level>0 ? `<button class="btn" onclick="shareMedal('${s.id}')">📤 Compartir esta medalla</button>` : ''}
+    <button class="btn ghost" style="margin-top:9px" onclick="openMedalsScreen()">← Volver a mis medallas</button>
+  `;
+  openModal('recapModalOverlay');
+}
+
+async function shareText(title, text){
+  try{
+    if (navigator.share){ await navigator.share({ title, text }); return; }
+  }catch(e){ /* usuario canceló */ return; }
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('Copiado — pégalo donde quieras 📋');
+  }catch(e){ showToast('No se pudo compartir desde aquí'); }
+}
+function shareLevel(){
+  const L = userLevel();
+  const earned = allMedalStates().filter(s=>s.level>0).length;
+  shareText('Mi nivel en RENTAPP',
+    `🎖 Nivel ${L.level} — ${L.title}\n${L.xp.toLocaleString('en-US')} XP · ${earned} medallas desbloqueadas\nLlevando mis finanzas al día con RENTAPP 🇵🇦`);
+}
+function shareMedal(id){
+  const s = medalState(MEDALS.find(m=>m.id===id));
+  shareText('Mi medalla en RENTAPP',
+    `${s.emoji} ${s.name} — rango ${s.rank.n} (nivel ${s.level}/5)\n${s.desc}\nDesbloqueada en RENTAPP 🇵🇦`);
+}
+function checkMedalUnlocks(){
+  /* Sin popups: los logros nuevos entran como notificación en la medallita del header. */
+  userData.medalsSeen = userData.medalsSeen || [];
+  const seen = new Set(userData.medalsSeen);
+  const fresh = allMedalStates().filter(s=> s.level>0 && !seen.has(s.id+':'+s.level));
+  if (!fresh.length) return false;
+  haptic([12,60,18]);
+  persistUserState();
+  fresh.forEach(s=>{
+    userData.medalsSeen.push(s.id+':'+s.level);
+    pushNotif('medal', `${s.name} · ${s.rank.n}`, s.level===1 ? 'Nueva medalla desbloqueada' : `Ascendiste al nivel ${s.level} de 5`, s.emoji, s.id);
+  });
+  return true;
+}
+
+/* ======================= CENTRO DE NOTIFICACIONES ======================= */
+function pushNotif(kind, title, sub, emoji, ref){
+  userData.notifs = userData.notifs || [];
+  userData.notifs.unshift({
+    id: 'n-'+Math.random().toString(36).slice(2,9),
+    kind, title, sub, emoji: emoji||'🔔', ref: ref||null,
+    ts: new Date().toISOString(), read:false
+  });
+  if (userData.notifs.length > 60) userData.notifs.length = 60;
+  persistUserState();
+}
+function notifsOf(kind){ return (userData.notifs||[]).filter(n=>n.kind===kind); }
+function unreadCount(kind){
+  const base = notifsOf(kind).filter(n=>!n.read).length;
+  if (kind==='recur') return base + getPendingRecurring().length;
+  return base;
+}
+function notifTimeAgo(iso){
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff/60000);
+  if (min < 1) return 'ahora';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min/60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h/24);
+  if (d === 1) return 'ayer';
+  if (d < 30) return `hace ${d} días`;
+  return new Date(iso).toLocaleDateString('es-PA', { day:'numeric', month:'short' });
+}
+function headerIconBtnHtml(kind){
+  const n = unreadCount(kind);
+  const icon = kind==='recur' ? '🔔' : '🎖';
+  const label = kind==='recur' ? 'Notificaciones' : 'Logros';
+  return `<button class="btn small ghost" title="${label}" aria-label="${label}" style="position:relative;width:38px;height:34px;padding:0;font-size:15px;flex-shrink:0" onclick="openNotifCenter('${kind}')">
+    ${icon}
+    ${n ? `<span style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--red);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1">${n>9?'9+':n}</span>` : ''}
+  </button>`;
+}
+function openNotifCenter(kind){
+  const list = notifsOf(kind);
+  const pending = kind==='recur' ? getPendingRecurring() : [];
+  const isMedal = kind==='medal';
+
+  const pendingHtml = pending.length ? `
+    <div class="sec-title" style="margin-bottom:6px">Esperando tu confirmación</div>
+    <div class="card" style="padding:4px 12px;margin-bottom:16px;border-color:var(--amber)">
+      ${pending.map(r=>`
+        <div class="card-list-item">
+          <div class="tx-ic" style="background:rgba(240,178,62,.15)">${r.type==='income'?'💵':r.type==='investment'?'📈':'🔁'}</div>
+          <div class="tx-info"><div class="tx-name">${escHtml(r.name)}</div><div class="tx-meta">${recurScheduleText(r)}</div></div>
+          <button class="btn small" style="width:auto;height:auto;padding:6px 11px;font-size:11px" onclick="closeModal('recapModalOverlay'); payRecur('${r.id}')">${fmt(r.amount)} ✓</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  const listHtml = list.length ? `
+    <div class="card" style="padding:4px 12px">
+      ${list.slice(0,25).map(n=>`
+        <div class="card-list-item" ${isMedal && n.ref ? `style="cursor:pointer" onclick="openMedalDetail('${n.ref}')"` : ''}>
+          <div class="tx-ic" style="background:${n.read?'var(--surface3)':'rgba(59,224,207,.15)'}">${n.emoji}</div>
+          <div class="tx-info">
+            <div class="tx-name" style="${n.read?'':'font-weight:800'}">${escHtml(n.title)}</div>
+            <div class="tx-meta">${escHtml(n.sub)} · ${notifTimeAgo(n.ts)}</div>
+          </div>
+          ${!n.read ? `<div style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0"></div>` : (isMedal?`<div class="more-chev">›</div>`:'')}
+        </div>`).join('')}
+    </div>` : `
+    <div class="card"><div class="empty-state" style="padding:22px">
+      <div class="ic">${isMedal?'🎖':'🔔'}</div>
+      <div class="t">${isMedal
+        ? 'Todavía no has desbloqueado medallas. Registra movimientos y cumple tu presupuesto — irán apareciendo aquí.'
+        : 'Nada por aquí. Cuando registres un pago recurrente te avisamos en este espacio.'}</div>
+    </div></div>`;
+
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:28px">${isMedal?'🎖':'🔔'}</div>
+      <div class="modal-title" style="margin-bottom:2px">${isMedal?'Tus logros':'Notificaciones'}</div>
+      <div style="font-size:11.5px;color:var(--text3)">${isMedal?'Medallas y ascensos de rango':'Recurrentes ejecutados y pendientes'}</div>
+    </div>
+    ${pendingHtml}
+    ${list.length ? `<div class="sec-title" style="margin-bottom:6px">${isMedal?'Historial de logros':'Actividad reciente'}</div>` : ''}
+    ${listHtml}
+    ${isMedal ? `<button class="btn ghost" style="margin-top:12px" onclick="openMedalsScreen()">Ver todas mis medallas →</button>` : ''}
+  `;
+  openModal('recapModalOverlay');
+
+  /* marcar como leídas al abrir */
+  let changed = false;
+  (userData.notifs||[]).forEach(n=>{ if (n.kind===kind && !n.read){ n.read = true; changed = true; } });
+  if (changed){ persistUserState(); setTimeout(()=>{ if (activeTab==='home') renderHome(); }, 60); }
+}
+
+/* =======================================================================
+   COSMÉTICOS Y CATÁLOGO DE RECOMPENSAS
+   Todo se desbloquea con el NIVEL GENERAL (XP de las 11 medallas juntas),
+   no solo con referidos: quien nunca invita a nadie pero mantiene buenos
+   hábitos llega exactamente al mismo lugar. Lo único exclusivo de referir
+   es un acento sutil que se dibuja ENCIMA del marco que ya ganaste.
+   ======================================================================= */
+
+/* --- vibración: gratis, se siente premium, y respeta al que no la quiere --- */
+function haptic(pattern){
+  try{ if (navigator.vibrate) navigator.vibrate(pattern||12); }catch(e){}
+}
+
+/* --- MARCOS DE AVATAR: uno cada 4 niveles, usando los 5 RANKS --- */
+const FRAME_TIERS = [
+  { lvl:1,  rank:0, name:'Sin marco',        desc:'Tu punto de partida.' },
+  { lvl:4,  rank:0, name:'Marco de bronce',  desc:'El primer metal. Ya no eres novato.' },
+  { lvl:8,  rank:1, name:'Marco de plata',   desc:'Constancia visible.' },
+  { lvl:12, rank:2, name:'Marco de oro',     desc:'Hábitos sólidos y sostenidos.' },
+  { lvl:16, rank:3, name:'Marco de platino', desc:'Muy poca gente llega aquí.' },
+  { lvl:20, rank:4, name:'Marco de diamante',desc:'El tope. Dominio total.' }
+];
+function currentFrame(){
+  const L = userLevel().level;
+  let f = FRAME_TIERS[0];
+  FRAME_TIERS.forEach(t=>{ if (L >= t.lvl) f = t; });
+  return f;
+}
+function nextFrame(){
+  const L = userLevel().level;
+  return FRAME_TIERS.find(t=> t.lvl > L) || null;
+}
+
+/* --- SKINS DEL COCHINITO / ANILLO: uno cada 2 niveles --- */
+const SKIN_TIERS = [
+  { lvl:1,  id:'clasico',  name:'Clásico',        emoji:'🐖', ring:'var(--accent)',  desc:'El cochinito de siempre.' },
+  { lvl:3,  id:'cobre',    name:'Cobre',          emoji:'🐷', ring:'#C08A52', desc:'Tu primer acabado metálico.' },
+  { lvl:5,  id:'plata',    name:'Plata',          emoji:'🐽', ring:'#C9D1D9', desc:'Brilla con la constancia.' },
+  { lvl:7,  id:'oro',      name:'Oro',            emoji:'🪙', ring:'#F0C24A', desc:'El clásico de los que ahorran en serio.' },
+  { lvl:9,  id:'esmeralda',name:'Esmeralda',      emoji:'💚', ring:'#3ECF8E', desc:'Verde de balance positivo sostenido.' },
+  { lvl:11, id:'zafiro',   name:'Zafiro',         emoji:'💙', ring:'#56B8F5', desc:'Frío y calculado.' },
+  { lvl:13, id:'rubi',     name:'Rubí',           emoji:'❤️', ring:'#F2635F', desc:'Para quien mató sus deudas.' },
+  { lvl:15, id:'amatista', name:'Amatista',       emoji:'💜', ring:'#A78BFA', desc:'Inversión constante, mes tras mes.' },
+  { lvl:18, id:'diamante', name:'Diamante',       emoji:'💎', ring:'#9FE7E0', desc:'Casi nadie llega. Tú sí.' },
+  { lvl:22, id:'mogul',    name:'Mogul',          emoji:'👑', ring:'#FFD700', desc:'El acabado final. Mariscal Mogul.' }
+];
+function unlockedSkins(){
+  const L = userLevel().level;
+  return SKIN_TIERS.filter(t=> L >= t.lvl);
+}
+function currentSkin(){
+  const unlocked = unlockedSkins();
+  if (userData.equippedSkin){
+    const eq = unlocked.find(t=>t.id===userData.equippedSkin);
+    if (eq) return eq;
+  }
+  return unlocked.length ? unlocked[unlocked.length-1] : SKIN_TIERS[0];
+}
+function equipSkin(id){
+  const t = unlockedSkins().find(x=>x.id===id);
+  if (!t){ showToast('Todavía no has desbloqueado ese acabado'); return; }
+  userData.equippedSkin = id;
+  persistUserState();
+  haptic(14);
+  showToast(`Acabado ${t.name} equipado ${t.emoji}`);
+  openRewardsCatalog();
+  if (activeTab==='home') renderHome();
+}
+
+/* --- ÍCONO DE PANTALLA DE INICIO: solo en el rango tope --- */
+const APP_ICON_UNLOCK_LEVEL = 20;
+function appIconUnlocked(){ return userLevel().level >= APP_ICON_UNLOCK_LEVEL; }
+
+/* --- ACENTO EXCLUSIVO DE REFERIDOS (se dibuja encima del marco) --- */
+function referralAccentLevel(){
+  const m = medalState(MEDALS.find(x=>x.id==='referrals'));
+  return m ? m.level : 0;
+}
+
+/* --- AVATAR CON MARCO: visible en el header todo el tiempo --- */
+function avatarWithFrameHtml(size){
+  const s = size || 40;
+  const f = currentFrame();
+  const r = RANKS[f.rank];
+  const initial = (displayName(currentUser)||'?').trim().charAt(0).toUpperCase();
+  const acc = referralAccentLevel();
+  const hasFrame = f.lvl > 1;
+  return `<div style="position:relative;width:${s}px;height:${s}px;flex-shrink:0;cursor:pointer" onclick="openRewardsCatalog()">
+    ${hasFrame ? `<div style="position:absolute;inset:-3px;border-radius:50%;background:linear-gradient(135deg,${r.c1},${r.c2});"></div>` : ''}
+    ${acc>0 ? `<div style="position:absolute;inset:-5px;border-radius:50%;border:1.5px dashed var(--accent);opacity:${.35+acc*.13}"></div>` : ''}
+    <div style="position:absolute;inset:0;border-radius:50%;background:var(--surface3);color:var(--text);display:flex;align-items:center;justify-content:center;font-size:${Math.round(s*.42)}px;font-weight:800">${initial}</div>
+  </div>`;
+}
+
+/* ======================= CATÁLOGO DE RECOMPENSAS ======================= */
+function rewardRowHtml(opts){
+  const { icon, name, sub, unlocked, req, onclick } = opts;
+  return `<div class="card-list-item" style="cursor:pointer;${unlocked?'':'opacity:.6'}" onclick="${onclick}">
+    <div class="tx-ic" style="background:${unlocked?'rgba(59,224,207,.15)':'var(--surface3)'};font-size:15px">${unlocked?icon:'🔒'}</div>
+    <div class="tx-info">
+      <div class="tx-name">${escHtml(name)}</div>
+      <div class="tx-meta" style="color:${unlocked?'var(--accent)':'var(--text3)'}">${unlocked?(sub||'Desbloqueado'):escHtml(req)}</div>
+    </div>
+    <div class="more-chev">›</div>
+  </div>`;
+}
+
+function openRewardsCatalog(){
+  const L = userLevel();
+  const f = currentFrame(), nf = nextFrame();
+  const skins = SKIN_TIERS;
+  const cur = currentSkin();
+  const acc = referralAccentLevel();
+  const refMedal = medalState(MEDALS.find(x=>x.id==='referrals'));
+
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:28px">🏅</div>
+      <div class="modal-title" style="margin-bottom:2px">Recompensas</div>
+      <div style="font-size:11.5px;color:var(--text3);line-height:1.5;max-width:320px;margin:0 auto">
+        Todo esto se desbloquea subiendo de nivel — y subes de nivel con <b>cualquiera</b> de tus buenos hábitos, no solo invitando gente.
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;text-align:center">
+      <div style="display:flex;justify-content:center;margin-bottom:10px">${avatarWithFrameHtml(56)}</div>
+      <div style="font-size:15px;font-weight:800">Nivel ${L.level} · ${L.title}</div>
+      <div style="font-size:11.5px;color:var(--text3);margin:4px 0 9px">${f.name}${acc>0?` · acento de Embajador nv.${acc}`:''}</div>
+      <div class="progress-track"><div class="progress-fill" style="width:${L.pct}%"></div></div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:6px">${Math.max(0,L.next-L.xp).toLocaleString('en-US')} XP para el nivel ${L.level+1}</div>
+    </div>
+
+    <div class="sec-title">🖼️ Marcos de avatar</div>
+    <div class="card" style="padding:4px 12px;margin-bottom:16px">
+      ${FRAME_TIERS.slice(1).map(t=>rewardRowHtml({
+        icon:'🖼️', name:t.name, sub:'Desbloqueado',
+        unlocked: L.level >= t.lvl,
+        req:`Nivel ${t.lvl}`,
+        onclick:`showRewardDetail('frame','${t.lvl}')`
+      })).join('')}
+    </div>
+
+    <div class="sec-title">🐖 Acabados del cochinito</div>
+    <div class="card" style="padding:4px 12px;margin-bottom:16px">
+      ${skins.map(t=>rewardRowHtml({
+        icon:t.emoji, name:t.name,
+        sub: cur.id===t.id ? 'En uso ✓' : 'Toca para equipar',
+        unlocked: L.level >= t.lvl,
+        req:`Nivel ${t.lvl}`,
+        onclick:`showRewardDetail('skin','${t.id}')`
+      })).join('')}
+    </div>
+
+    <div class="sec-title">✨ Extras</div>
+    <div class="card" style="padding:4px 12px;margin-bottom:16px">
+      ${rewardRowHtml({ icon:'🎉', name:'Confeti de rango', sub:'Tus celebraciones usan tu metal',
+        unlocked: L.level>=4, req:'Nivel 4', onclick:`showRewardDetail('confetti','')` })}
+      ${rewardRowHtml({ icon:'📳', name:'Vibración en logros', sub:'Activa',
+        unlocked: L.level>=2, req:'Nivel 2', onclick:`showRewardDetail('haptic','')` })}
+      ${rewardRowHtml({ icon:'📱', name:'Ícono dorado de la app', sub:'Disponible',
+        unlocked: appIconUnlocked(), req:`Nivel ${APP_ICON_UNLOCK_LEVEL}`, onclick:`showRewardDetail('appicon','')` })}
+      ${rewardRowHtml({ icon:'🤝', name:'Acento de Embajador', sub:`Nivel ${acc} de 5`,
+        unlocked: acc>0, req:'Invita a 1 amigo que complete su Despegue', onclick:`showRewardDetail('refaccent','')` })}
+    </div>
+
+    <button class="btn ghost" onclick="openMedalsScreen()">← Volver a mis medallas</button>
+  `;
+  openModal('recapModalOverlay');
+}
+
+function showRewardDetail(kind, key){
+  const L = userLevel();
+  let icon='🏅', name='', desc='', reqText='', unlocked=false, extra='';
+
+  if (kind==='frame'){
+    const t = FRAME_TIERS.find(x=>String(x.lvl)===String(key));
+    const r = RANKS[t.rank];
+    icon='🖼️'; name=t.name; desc=t.desc;
+    unlocked = L.level >= t.lvl;
+    reqText = `Alcanza el nivel ${t.lvl}`;
+    extra = `<div style="display:flex;justify-content:center;margin:14px 0">
+      <div style="position:relative;width:64px;height:64px">
+        <div style="position:absolute;inset:-4px;border-radius:50%;background:linear-gradient(135deg,${r.c1},${r.c2});${unlocked?'':'filter:grayscale(1);opacity:.4'}"></div>
+        <div style="position:absolute;inset:0;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800">A</div>
+      </div></div>`;
+  } else if (kind==='skin'){
+    const t = SKIN_TIERS.find(x=>x.id===key);
+    icon=t.emoji; name='Acabado '+t.name; desc=t.desc;
+    unlocked = L.level >= t.lvl;
+    reqText = `Alcanza el nivel ${t.lvl}`;
+    extra = `<div style="text-align:center;margin:14px 0">
+      <div style="font-size:52px;${unlocked?'':'filter:grayscale(1);opacity:.4'}">${t.emoji}</div>
+      <div style="width:64px;height:5px;border-radius:3px;background:${t.ring};margin:10px auto 0;${unlocked?'':'opacity:.3'}"></div>
+    </div>
+    ${unlocked ? `<button class="btn" onclick="equipSkin('${t.id}')">${currentSkin().id===t.id?'✓ En uso':'Equipar este acabado'}</button>` : ''}`;
+  } else if (kind==='confetti'){
+    icon='🎉'; name='Confeti de rango'; unlocked = L.level>=4; reqText='Alcanza el nivel 4';
+    desc='Cuando desbloqueas una medalla o subes de nivel, la celebración usa el metal de tu rango actual: una chispa simple en bronce, una lluvia dorada en los rangos altos.';
+  } else if (kind==='haptic'){
+    icon='📳'; name='Vibración en logros'; unlocked = L.level>=2; reqText='Alcanza el nivel 2';
+    desc='Tu teléfono vibra suavemente cuando desbloqueas algo o subes de nivel. Se siente, no se oye — nada de sonidos en medio de una reunión.';
+  } else if (kind==='appicon'){
+    icon='📱'; name='Ícono dorado de la app'; unlocked = appIconUnlocked(); reqText=`Alcanza el nivel ${APP_ICON_UNLOCK_LEVEL}`;
+    desc='Un ícono exclusivo para cuando guardas RENTAPP en tu pantalla de inicio. Reservado para el rango más alto.';
+    extra = unlocked
+      ? `<div style="font-size:11.5px;color:var(--amber);background:var(--surface2);border-radius:10px;padding:10px 12px;margin-top:12px;line-height:1.5">
+           ⚠️ Tu teléfono guardó el ícono viejo cuando agregaste la app a tu pantalla de inicio. Para ver el dorado tienes que quitar el acceso directo y volver a agregarlo — es cosa del sistema operativo, no de la app.
+         </div>`
+      : '';
+  } else if (kind==='refaccent'){
+    const m = medalState(MEDALS.find(x=>x.id==='referrals'));
+    icon='🤝'; name='Acento de Embajador'; unlocked = m.level>0;
+    reqText = 'Invita a 1 amigo que complete su Despegue';
+    desc='Un aro exclusivo que se dibuja encima del marco que ya ganaste por tu nivel. Es lo único que no se puede conseguir de otra forma: hay que traer gente real que de verdad use la app.';
+    extra = `<div style="font-size:11.5px;color:var(--text3);margin-top:12px;line-height:1.5">Vas en <b style="color:var(--text)">${m.value}</b> ${m.value===1?'amigo':'amigos'} · rango ${m.rank?m.rank.n:'—'} (${m.level}/5)</div>
+      <button class="btn ghost" style="margin-top:12px" onclick="openReferralScreen()">Ver mis invitados →</button>`;
+  }
+
+  document.getElementById('recapModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:8px">
+      <div style="font-size:30px">${unlocked?icon:'🔒'}</div>
+      <div class="modal-title" style="margin:8px 0 2px">${escHtml(name)}</div>
+      <div style="font-size:11.5px;font-weight:700;color:${unlocked?'var(--accent)':'var(--amber)'}">${unlocked?'Desbloqueado ✓':'Requisito: '+escHtml(reqText)}</div>
+    </div>
+    ${extra}
+    <div style="font-size:12.5px;color:var(--text2);line-height:1.6;text-align:center;margin:14px 0">${escHtml(desc)}</div>
+    ${!unlocked ? `<div class="card" style="padding:12px 14px;margin-bottom:12px">
+      <div class="row-between" style="margin-bottom:6px">
+        <span style="font-size:11.5px;color:var(--text3)">Tu nivel actual</span>
+        <span style="font-size:11.5px;font-weight:800">Nivel ${L.level}</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:${L.pct}%"></div></div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:6px">Sigue registrando, cumpliendo tu presupuesto e invirtiendo — todo suma XP.</div>
+    </div>` : ''}
+    <button class="btn ghost" onclick="openRewardsCatalog()">← Volver al catálogo</button>
+  `;
+  openModal('recapModalOverlay');
+}
+
+/* ======================= STORIES ======================= */
+const STORY_BGS = [
+  'linear-gradient(160deg,#0F3B3A,#0A1014 70%)',
+  'linear-gradient(160deg,#2C1E52,#0A1014 70%)',
+  'linear-gradient(160deg,#123049,#0A1014 70%)',
+  'linear-gradient(160deg,#4A2A1C,#0A1014 70%)',
+  'linear-gradient(160deg,#0D3A2A,#0A1014 70%)',
+  'linear-gradient(160deg,#3A1F3D,#0A1014 70%)'
+];
+let storySlides = [], storyIndex = 0, storyTimer = null, storyMeta = {};
+
+function pctChange(a, b){ if (!b) return null; return Math.round((a-b)/b*100); }
+
+function buildStorySlides(scope){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth()+1;
+  const isYear = scope==='year';
+  const txs = isYear ? getTxs(activeYear,null) : getTxs(y,m);
+  const prevD = new Date(y, m-2, 1);
+  const prevTxs = isYear ? getTxs(activeYear-1,null) : getTxs(prevD.getFullYear(), prevD.getMonth()+1);
+  const inc = sum(txs,['income']), exp = sum(txs,['expense']);
+  const pInc = sum(prevTxs,['income']), pExp = sum(prevTxs,['expense']);
+  const net = inc - exp;
+  const periodLabel = isYear ? `${activeYear}` : `${monthName(m)} ${y}`;
+
+  const byCat = {};
+  txs.filter(t=>t.type==='expense').forEach(t=>{ byCat[t.category]=(byCat[t.category]||0)+t.amount; });
+  const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  const spent = isYear
+    ? (()=>{ const acc={Necesidades:0,Deseos:0,Ahorros:0,Inversiones:0,Deudas:0};
+             for(let i=1;i<=12;i++){ const s=bucketSpentInMonthOf(activeYear,i); Object.keys(acc).forEach(k=>acc[k]+=s[k]||0); } return acc; })()
+    : bucketSpentInMonthOf(y,m);
+  const savedTotal = (spent.Ahorros||0) + (spent.Inversiones||0);
+  const savedRate = inc>0 ? Math.round(savedTotal/inc*100) : 0;
+  const L = userLevel();
+  const states = allMedalStates();
+  const earned = states.filter(s=>s.level>0);
+  const streak = computeStreak();
+  const unass = Math.max(0, unassignedAmount(inc, spent));
+  const incChange = pctChange(inc, pInc);
+  const expChange = pctChange(exp, pExp);
+
+  const slides = [];
+  slides.push({ bg:STORY_BGS[0], kicker:'TU HISTORIA FINANCIERA', emoji:'🚀',
+    headline:periodLabel, value:'', sub:`Esto fue lo que lograste. Desliza para verlo →`,
+    accent:'var(--accent)' });
+
+  slides.push({ bg:STORY_BGS[1], kicker:'ENTRÓ VS. SALIÓ', emoji: net>=0?'💚':'⚠️',
+    headline: net>=0 ? 'Cerraste en verde' : 'Cerraste en rojo',
+    value: fmt(Math.abs(net)),
+    sub: net>=0
+      ? `Ingresaste ${fmt(inc)} y gastaste ${fmt(exp)}. Te quedaron ${fmt(net)} a favor — eso es control, no suerte. 👏`
+      : `Ingresaste ${fmt(inc)} y gastaste ${fmt(exp)}. Vas ${fmt(-net)} por debajo. No es el fin del mundo: identifica una sola categoría y recórtala 10%.`,
+    bars:[{ label:'Ingresos', v:inc, max:Math.max(inc,exp,1), color:'#3ECF8E' },
+          { label:'Gastos',   v:exp, max:Math.max(inc,exp,1), color:'#F2635F' }],
+    accent: net>=0 ? '#3ECF8E' : '#F2635F' });
+
+  if (incChange!==null || expChange!==null){
+    const good = (incChange||0) >= 0 && (expChange||0) <= 0;
+    slides.push({ bg:STORY_BGS[2], kicker:'CONTRA EL PERÍODO ANTERIOR', emoji: good?'📈':'🔍',
+      headline: good ? 'Vas mejorando' : 'Hay margen de mejora',
+      value: incChange!==null ? `${incChange>=0?'+':''}${incChange}%` : '—',
+      sub: `${incChange!==null?`Tus ingresos ${incChange>=0?'subieron':'bajaron'} ${Math.abs(incChange)}%`:'Sin comparativo de ingresos'}${expChange!==null?` y tus gastos ${expChange>=0?'subieron':'bajaron'} ${Math.abs(expChange)}%`:''}. ${good?'Sigue exactamente así.':'Un ajuste pequeño y constante pesa más que uno grande y puntual.'}`,
+      accent: good ? '#3ECF8E' : '#F0B23E' });
+  }
+
+  if (top.length){
+    slides.push({ bg:STORY_BGS[3], kicker:'DONDE MÁS SE FUE', emoji:'🎯',
+      headline: top[0][0].length>26 ? top[0][0].slice(0,26)+'…' : top[0][0],
+      value: fmt(top[0][1]),
+      sub: `Representa el ${exp>0?Math.round(top[0][1]/exp*100):0}% de todo lo que gastaste. ${top.length>1?`Le siguen ${top[1][0]} y ${top[2]?top[2][0]:'…'}.`:''}`,
+      list: top.map(([c,v])=>({ label:c, value:fmt(v), pct: exp>0?Math.round(v/exp*100):0 })),
+      accent:'#F0B23E' });
+  }
+
+  slides.push({ bg:STORY_BGS[4], kicker:'LO QUE TE GUARDASTE', emoji: savedRate>=15?'🏦':'🐖',
+    headline: savedRate>=15 ? '¡Excelente tasa de ahorro!' : 'Tu tasa de ahorro',
+    value: `${savedRate}%`,
+    sub: savedRate>=20
+      ? `Ahorraste e invertiste ${fmt(savedTotal)}. Estás por encima del 20% que recomiendan los planificadores. Eso es de otro nivel. 🎉`
+      : savedRate>=10
+        ? `Ahorraste e invertiste ${fmt(savedTotal)}. Vas bien — apuntar al 20% es la siguiente meta natural.`
+        : `Ahorraste e invertiste ${fmt(savedTotal)}. Empieza chico: automatiza un atajo que mande el sobrante a ahorros y súbelo poco a poco.`,
+    accent:'#A78BFA' });
+
+  if (unass > 0.5){
+    slides.push({ bg:STORY_BGS[5], kicker:'DINERO SIN DESTINO', emoji:'💸',
+      headline:'Te quedó plata sin asignar', value: fmt(unass),
+      sub:`Ese dinero no está haciendo nada. Con un atajo lo mandas a ahorros, a una meta o a una deuda en un solo toque.`,
+      accent:'#F0B23E' });
+  }
+
+  slides.push({ bg:STORY_BGS[1], kicker:'TU CONSTANCIA', emoji:'🔥',
+    headline: streak>=7 ? '¡Racha imparable!' : 'Tu racha de registro',
+    value: `${streak} ${streak===1?'día':'días'}`,
+    sub: streak>=7
+      ? `${streak} días seguidos registrando. La constancia es lo que separa un presupuesto real de uno imaginario. 💪`
+      : `Registrar todos los días es el hábito que sostiene todo lo demás. Vas por ${streak} — intenta llegar a 7.`,
+    accent:'#F2635F' });
+
+  slides.push({ bg:STORY_BGS[2], kicker:'TU RANGO', emoji:'🎖',
+    headline: `Nivel ${L.level}`, value: L.title,
+    sub: `${L.xp.toLocaleString('en-US')} XP acumulados · ${earned.length} de ${states.length} medallas desbloqueadas. Te faltan ${Math.max(0,L.next-L.xp).toLocaleString('en-US')} XP para el nivel ${L.level+1}.`,
+    medals: earned.slice(0,4),
+    accent:'var(--accent)' });
+
+  const closing = net>=0 && savedRate>=10;
+  slides.push({ bg:STORY_BGS[0], kicker: closing?'FELICIDADES':'EL SIGUIENTE PASO', emoji: closing?'🎉':'💡',
+    headline: closing ? '¡Buen período!' : 'Vamos por más',
+    value:'',
+    sub: closing
+      ? `Cerraste ${periodLabel} con ${fmt(net)} a favor y un ${savedRate}% de ahorro. Comparte tu progreso y sigue así.`
+      : `${periodLabel} fue de aprendizaje. Elige una sola cosa para el próximo período: recortar tu categoría más alta o subir tu ahorro 5%. Una sola. Así se gana.`,
+    cta:true, accent: closing?'var(--accent)':'#F0B23E' });
+
+  storyMeta = { periodLabel, inc, exp, net, savedRate, streak, level:L.level, scope };
+  return slides;
+}
+
+function openStories(scope){
+  storySlides = buildStorySlides(scope||'month');
+  storyIndex = 0;
+  document.getElementById('storyOverlay').classList.add('show');
+  renderStory();
+}
+function closeStories(){
+  clearTimeout(storyTimer);
+  document.getElementById('storyOverlay').classList.remove('show');
+}
+function storyNext(){ if (storyIndex < storySlides.length-1){ storyIndex++; renderStory(); } else closeStories(); }
+function storyPrev(){ if (storyIndex > 0){ storyIndex--; renderStory(); } }
+
+function renderStory(){
+  const s = storySlides[storyIndex];
+  const overlay = document.getElementById('storyOverlay');
+  overlay.style.background = s.bg;
+
+  document.getElementById('storyBars').innerHTML = storySlides.map((_,i)=>
+    `<div class="story-bar"><div class="story-bar-fill" style="width:${i<storyIndex?100:i===storyIndex?100:0}%;transition:${i===storyIndex?'width 4.6s linear':'none'}"></div></div>`).join('');
+
+  let extra = '';
+  if (s.bars){
+    extra += `<div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;margin-top:22px">
+      ${s.bars.map(b=>`
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.75);margin-bottom:5px"><span>${b.label}</span><b style="color:#fff">${fmt(b.v)}</b></div>
+          <div style="height:10px;border-radius:6px;background:rgba(255,255,255,.13);overflow:hidden">
+            <div class="story-grow" style="height:10px;border-radius:6px;background:${b.color};--w:${Math.max(4,Math.round(b.v/b.max*100))}%"></div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }
+  if (s.list){
+    extra += `<div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:9px;margin-top:22px">
+      ${s.list.map((it,i)=>`
+        <div style="display:flex;align-items:center;gap:10px;animation:story-in .5s ${0.15*i+0.2}s both">
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+          <div style="flex:1;min-width:0;font-size:13px;color:rgba(255,255,255,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(it.label)}</div>
+          <div style="font-size:13px;font-weight:800;color:#fff">${it.value}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.55);width:34px;text-align:right">${it.pct}%</div>
+        </div>`).join('')}
+    </div>`;
+  }
+  if (s.medals && s.medals.length){
+    extra += `<div style="display:flex;gap:8px;justify-content:center;margin-top:24px;color:rgba(255,255,255,.5)">
+      ${s.medals.map((m,i)=>`<div style="animation:medal-pop .6s ${0.15*i+0.25}s both">${medalBadgeSvg(m, 52)}</div>`).join('')}
+    </div>`;
+  }
+  if (s.cta){
+    const showExtend = !isPremiumActive() || trialDaysLeft()<=3;
+    extra += `<div style="width:100%;max-width:340px;margin-top:26px">
+      <button class="btn" style="background:#fff;color:#0A1014" onclick="shareStorySummary()">📤 Compartir mi resumen</button>
+      ${showExtend ? `<button class="btn ghost" style="margin-top:10px;border-color:rgba(255,255,255,.4);color:#fff" onclick="closeStories(); openUpgradeScreen()">✨ Extender mi Premium</button>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('storyStage').innerHTML = `
+    <div class="story-slide">
+      <div style="font-size:44px;animation:story-in .5s both">${s.emoji}</div>
+      <div style="font-size:10.5px;font-weight:800;letter-spacing:.16em;color:${s.accent};margin-top:14px;animation:story-in .5s .06s both">${s.kicker}</div>
+      <div style="font-size:25px;font-weight:800;color:#fff;margin-top:8px;line-height:1.2;animation:story-in .5s .12s both">${s.headline}</div>
+      ${s.value ? `<div style="font-size:${String(s.value).length>14?'21px':'40px'};font-weight:800;color:${s.accent};margin-top:10px;letter-spacing:-1px;font-variant-numeric:tabular-nums;animation:story-in .55s .18s both">${s.value}</div>` : ''}
+      <div style="font-size:13.5px;color:rgba(255,255,255,.8);line-height:1.6;margin-top:14px;max-width:330px;animation:story-in .5s .26s both">${s.sub}</div>
+      ${extra}
+    </div>`;
+
+  document.getElementById('storyFoot').innerHTML =
+    `<span style="font-size:11px;color:rgba(255,255,255,.45)">${storyIndex+1} / ${storySlides.length} · toca para avanzar</span>`;
+
+  clearTimeout(storyTimer);
+  storyTimer = setTimeout(()=>{ if (!s.cta) storyNext(); }, 4800);
+}
+function shareStorySummary(){
+  const M = storyMeta;
+  shareText('Mi resumen en RENTAPP',
+    `📊 Mi ${M.scope==='year'?'año':'mes'} — ${M.periodLabel}\n` +
+    `Ingresos: ${fmt(M.inc)} · Gastos: ${fmt(M.exp)}\n` +
+    `Balance: ${fmt(M.net)} · Tasa de ahorro: ${M.savedRate}%\n` +
+    `🔥 Racha: ${M.streak} días · 🎖 Nivel ${M.level}\n` +
+    `Hecho con RENTAPP 🇵🇦`);
+}
+
+/* Reporte automático al terminar el período Premium */
+function maybeAutoPremiumStory(){
+  if (!userData || !userData.premiumGiftGranted) return;
+  if (isPremiumActive()) return;
+  userData.storiesSeen = userData.storiesSeen || [];
+  const key = 'premium-end-'+(userData.trialEndsAt||'').slice(0,10);
+  if (userData.storiesSeen.includes(key)) return;
+  userData.storiesSeen.push(key);
+  setTimeout(()=> openStories('month'), 900);
+}
+
 /* ======================= MODAL HELPERS ======================= */
 function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -4168,11 +6220,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
   const txDate = document.getElementById('txDate');
   if (txDate) txDate.value = new Date().toISOString().slice(0,10);
+
+  /* Tocar fuera del panel del botón + lo cierra */
+  document.addEventListener('click', (e)=>{
+    if (!fabBubblesOpen) return;
+    const panel = document.getElementById('fabBubbles');
+    const fabBtn = document.getElementById('fabMainBtn');
+    if (panel && !panel.contains(e.target) && fabBtn && !fabBtn.contains(e.target)) closeFabPanel();
+  });
   renderWelcomeScreen();
   renderAuthScreen();
   document.getElementById('preAuthBgLayers').innerHTML = outsideBgLayersHtml('p');
   startWelcomeFactRotation();
-  tryResumeSession();
 
   /* Prevent the classic "scroll over a focused number input silently changes its value"
      browser behavior, which was shaving cents off amounts during edits. */
