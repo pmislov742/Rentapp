@@ -586,8 +586,8 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
    Supabase Dashboard → Project Settings → API
    La "anon key" es pública por diseño: la seguridad real vive en las
    políticas RLS de la base de datos, no en ocultar esta llave. */
-const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'TU-ANON-KEY';
+const SUPABASE_URL = 'https://raontltjqxxssklbclzz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_ACmAKLv8NuOKSa3jykEIFg_VV1fDpG-';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -1046,7 +1046,17 @@ function translateAuthError(msg){
   if (/already registered|already exists|user_already_exists/i.test(msg)) return 'Ese correo ya tiene una cuenta — intenta entrar en vez de crear una nueva';
   if (/password.*(6|least)/i.test(msg)) return 'La contraseña debe tener al menos 6 caracteres';
   if (/rate limit/i.test(msg)) return 'Demasiados intentos — espera un minuto e intenta de nuevo';
-  if (/network|fetch/i.test(msg)) return 'No hay conexión a internet — esta app necesita internet para funcionar';
+  if (/network|fetch/i.test(msg)){
+    /* El navegador reporta "failed to fetch" tanto si de verdad no hay internet
+       como si el problema es otro (URL mal configurada, CORS, proyecto pausado,
+       servidor caído). navigator.onLine distingue el primer caso; para el
+       segundo mostramos el detalle técnico para poder diagnosticarlo, en vez
+       de decir siempre "no hay internet" cuando puede ser otra cosa. */
+    if (navigator.onLine === false){
+      return 'No hay conexión a internet — esta app necesita internet para funcionar';
+    }
+    return 'No se pudo conectar con el servidor de RENTAPP (tu internet parece estar bien). Puede ser un problema temporal o de configuración. Detalle: ' + msg;
+  }
   return msg;
 }
 function displayName(user){
