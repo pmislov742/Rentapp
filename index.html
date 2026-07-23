@@ -542,6 +542,14 @@ select.select-year{ width:auto; padding:8px 10px; font-size:13px; font-weight:70
   </div>
 </div>
 
+<!-- Manejo de información de cuenta (reinicios / rollback) -->
+<div class="modal-overlay" id="acctModalOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div id="acctModalBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="quickEntryOverlay">
   <div class="modal-sheet" style="max-width:400px">
     <div class="modal-handle"></div>
@@ -767,7 +775,7 @@ function drawLineChart(containerId, labels, datasets, opts){
   container.appendChild(wrap);
 }
 
-function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[], investments:[], debts:[], generalSavings:{deposits:[]}, checkins:[], onboarded:false, reminderOptIn:false, tier:'trial', trialEndsAt:null, accentColor:null, chartStyle:'classic', themeMode:'dark', lastPaymentMethod:null, budgetCustomized:false, budgetPresetId:null, exploredTabs:{}, weeklyRecapWeeks:[], monthlyAiUses:0, premiumGiftGranted:false, allocShortcuts:[], txShortcuts:[], xpBonus:0, medalsSeen:[], storiesSeen:[], goalsAchievedLog:[], notifs:[], referralCode:null, referredBy:null, referrals:[], referredBonusClaimed:false, referredStoryClaimed:false, equippedSkin:null }; }
+function blankData(){ return { transactions:[], recurringItems:[], snoozed:{}, budget:[], cards:[], goals:[], investments:[], debts:[], generalSavings:{deposits:[]}, checkins:[], onboarded:false, reminderOptIn:false, tier:'trial', trialEndsAt:null, accentColor:null, chartStyle:'classic', themeMode:'dark', lastPaymentMethod:null, budgetCustomized:false, budgetPresetId:null, exploredTabs:{}, weeklyRecapWeeks:[], monthlyAiUses:0, premiumGiftGranted:false, allocShortcuts:[], txShortcuts:[], xpBonus:0, medalsSeen:[], storiesSeen:[], goalsAchievedLog:[], notifs:[], referralCode:null, referredBy:null, referrals:[], referredBonusClaimed:false, referredStoryClaimed:false, equippedSkin:null, budgetUpdatedAt:null, everCountedAsReferralCompleted:false }; }
 const DEFAULT_BUDGET = [
   {name:'Necesidades', pct:50, color:'#3BE0CF'},{name:'Deseos', pct:20, color:'#F0B23E'},
   {name:'Ahorros', pct:15, color:'#A78BFA'},{name:'Inversiones', pct:15, color:'#56B8F5'},
@@ -880,6 +888,7 @@ async function loadAllUserData(){
   data.referrals = st.referrals || [];
   data.referredBonusClaimed = !!st.referred_bonus_claimed;
   data.referredStoryClaimed = !!st.referred_story_claimed;
+  data.budgetUpdatedAt = st.budget_updated_at || null;
   return data;
 }
 
@@ -915,13 +924,20 @@ async function persistSetting(patch){
   try{ await sb.from('user_settings').update(patch).eq('user_id', currentUser.id); }catch(e){ /* no bloquea la UI si falla */ }
 }
 
-/* ======================= VERIFICACIÓN DE CORREO =======================
+/* ======================= VERIFICACIÓN DE CORREO (modo suave) =============
    Supabase marca `email_confirmed_at` cuando la persona abre el enlace que
-   le llegó por correo. Es el paso más barato y más efectivo contra las
-   granjas de cuentas: obliga a tener un buzón real y distinto por cuenta.
-   Requiere que "Confirm email" esté ACTIVADO en:
-   Supabase → Authentication → Providers → Email.
-   ===================================================================== */
+   le llegó por correo. Sigue siendo la barrera más efectiva contra granjas
+   de cuentas: obliga a un buzón real y distinto por cuenta.
+
+   MODO SUAVE — decisión de producto firme: el login NO se bloquea. "Confirm
+   email" debe estar APAGADO en Authentication → Providers → Email, para que
+   signUp() devuelva sesión inmediata y la persona use la app desde el día 0.
+   La verificación viaja por MAGIC LINK (signInWithOtp): es un flujo separado
+   que funciona sin importar ese toggle, y al hacer clic Supabase llena
+   email_confirmed_at igual. Personalizar la plantilla en Authentication →
+   Email Templates → Magic Link ("Confirma tu correo en RENTAPP") y poner el
+   dominio real en Authentication → URL Configuration.
+   ======================================================================== */
 function isEmailVerified(){
   if (!currentUser) return false;
   return !!(currentUser.email_confirmed_at || currentUser.confirmed_at);
@@ -945,7 +961,12 @@ async function resendVerificationEmail(){
   const btn = document.getElementById('resendVerifyBtn');
   if (btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
   try{
-    const { error } = await sb.auth.resend({ type:'signup', email: currentUser.email });
+    /* Magic Link como verificación: al abrirlo, Supabase marca
+       email_confirmed_at — no depende del toggle "Confirm email". */
+    const { error } = await sb.auth.signInWithOtp({
+      email: currentUser.email,
+      options: { shouldCreateUser:false, emailRedirectTo: location.href.split('#')[0].split('?')[0] }
+    });
     if (error){
       showToast(/rate/i.test(error.message) ? 'Espera un momento antes de pedir otro correo' : 'No se pudo enviar: '+error.message);
     } else {
@@ -1079,6 +1100,9 @@ async function afterAuthSuccess(user){
   currentUser = user;
   userData = await loadAllUserData();
   enterApp();
+  /* referidos: primero registrar si esta cuenta llegó con ?ref=..., luego
+     leer del servidor el estado real (completados, cola, días acreditados) */
+  registerPendingReferral().then(()=> refreshReferralsFromServer()).then(ok=>{ if (ok) renderActiveTab(); });
   /* Si confirmó el correo en otra pestaña, que se refleje sin tener que
      cerrar sesión: revalidamos en segundo plano y repintamos si cambió. */
   const wasVerified = isEmailVerified();
@@ -1099,6 +1123,7 @@ async function tryResumeSession(){
     currentUser = data.session.user;
     userData = await loadAllUserData();
     enterApp();
+    refreshReferralsFromServer().then(ok=>{ if (ok) renderActiveTab(); });
   }
 }
 
@@ -1942,20 +1967,45 @@ function openUsageChecklist(){
   `;
   openModal('recapModalOverlay');
 }
-function maybeGrantUsageReward(){
+async function maybeGrantUsageReward(){
   if (userData.premiumGiftGranted) return;
   if (usageStats().pct < 100) return;
   userData.premiumGiftGranted = true;
-  const end = new Date(); end.setDate(end.getDate()+14);
-  userData.trialEndsAt = end.toISOString();
-  if (userData.tier !== 'premium') userData.tier = 'trial';
-  document.getElementById('recapModalBody').innerHTML = `
-    <div style="text-align:center">
-      <div style="font-size:40px">🎉</div>
-      <div class="modal-title" style="margin:8px 0 4px">¡Exploraste toda la app!</div>
-      <div style="font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:6px">Como regalo, activamos <b style="color:var(--purple)">14 días de Premium</b> gratis: análisis con IA ilimitado, escaneo de facturas, metas ilimitadas y más. Después decides si quieres continuar.</div>
-    </div>
-  `;
+  /* Bandera anti-fraude PERSISTENTE del lado del cliente: si esta cuenta entró
+     por invitación, queda contada como referido completado para siempre. La
+     versión que de verdad manda vive en el servidor (account_permanent_flags). */
+  if (userData.referredBy) userData.everCountedAsReferralCompleted = true;
+  persistUserState();
+  /* El regalo de 14 días lo concede el SERVIDOR (claim_despegue_gift), que
+     revisa la bandera permanente: si esta cuenta ya lo recibió alguna vez
+     (aunque haya hecho un reinicio total), devuelve false y no hay días. */
+  let granted = false;
+  try{
+    const { data, error } = await sb.rpc('claim_despegue_gift');
+    if (!error && data === true) granted = true;
+  }catch(e){ /* sin conexión: no regalamos localmente — el servidor decide */ }
+  if (granted){
+    try{
+      const { data:st } = await sb.from('user_settings').select('tier, trial_ends_at').eq('user_id', currentUser.id).maybeSingle();
+      if (st){ userData.tier = st.tier || userData.tier; userData.trialEndsAt = st.trial_ends_at || userData.trialEndsAt; }
+      if (userData.tier === 'free'){ userData.tier = 'trial'; persistSetting({ tier:'trial' }); }
+    }catch(e){}
+    document.getElementById('recapModalBody').innerHTML = `
+      <div style="text-align:center">
+        <div style="font-size:40px">🎉</div>
+        <div class="modal-title" style="margin:8px 0 4px">¡Exploraste toda la app!</div>
+        <div style="font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:6px">Como regalo, activamos <b style="color:var(--purple)">14 días de Premium</b> gratis: análisis con IA ilimitado, escaneo de facturas, metas ilimitadas y más. Después decides si quieres continuar.</div>
+      </div>
+    `;
+  } else {
+    document.getElementById('recapModalBody').innerHTML = `
+      <div style="text-align:center">
+        <div style="font-size:40px">🎉</div>
+        <div class="modal-title" style="margin:8px 0 4px">¡Completaste tu Despegue!</div>
+        <div style="font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:6px">Ya exploraste toda la app. El regalo de 14 días de Premium se entrega una sola vez por cuenta, y esta cuenta ya lo recibió antes.</div>
+      </div>
+    `;
+  }
   openModal('recapModalOverlay');
 }
 
@@ -3782,7 +3832,8 @@ function onBudgetSlide(i, val){
   if (totalEl) totalEl.textContent = budget.reduce((a,b)=>a+b.pct,0)+'%';
 }
 async function saveBudget(){
-  const { error } = await sb.from('user_settings').update({ budget:userData.budget }).eq('user_id', currentUser.id);
+  stampBudgetUpdated();
+  const { error } = await sb.from('user_settings').update({ budget:userData.budget, budget_updated_at:userData.budgetUpdatedAt }).eq('user_id', currentUser.id);
   if (error){ showToast('No se pudo guardar el presupuesto'); return; }
   userData.budgetCustomized = true;
   maybeGrantUsageReward();
@@ -3930,6 +3981,11 @@ function renderMore(){
       <div class="more-item" onclick="openReplayOnboarding()">
         <div class="more-ic">👋</div>
         <div class="more-info"><div class="more-name">Repasar bienvenida y tutorial</div><div class="more-sub">Vuelve a verlo cuando quieras — tu cuenta no se toca</div></div>
+        <div class="more-chev">›</div>
+      </div>
+      <div class="more-item" onclick="openAccountMgmt()">
+        <div class="more-ic">🗂️</div>
+        <div class="more-info"><div class="more-name">Manejo de información de cuenta</div><div class="more-sub">Reiniciar días, mes, año o toda la cuenta</div></div>
         <div class="more-chev">›</div>
       </div>
       <div class="more-item" onclick="logout()">
@@ -4579,7 +4635,7 @@ function renderOnbStep(){
   } else if (step.interactive==='budget'){
     const pending = window._pendingSuggestedBudget;
     if (pending){
-      if (!onbAppliedSuggestedBudget){ userData.budget = pending.budget.map(b=>({...b})); userData.budgetCustomized = true; onbAppliedSuggestedBudget = true; }
+      if (!onbAppliedSuggestedBudget){ userData.budget = pending.budget.map(b=>({...b})); userData.budgetCustomized = true; stampBudgetUpdated(); onbAppliedSuggestedBudget = true; }
       interactiveHtml = `<div class="card" style="text-align:left;margin-top:14px;width:100%;max-width:360px">
         <div class="sec-title" style="margin-bottom:2px">${pending.label}</div>
         <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Basado en lo que nos contaste antes de crear tu cuenta.</div>
@@ -4642,6 +4698,7 @@ function onbPickBudget(id){
   userData.budget = preset.budget;
   userData.budgetPresetId = id;
   userData.budgetCustomized = true;
+  stampBudgetUpdated();
   renderOnbStep();
 }
 let onbTxType = 'expense';
@@ -4889,6 +4946,9 @@ async function submitPreAuthRegister(){
   const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ display_name:name } } });
   btn.textContent = 'Crear cuenta gratis 🚀';
   if (error){ errEl.textContent = translateAuthError(error.message); return; }
+  /* Primer correo de verificación: sale solo, en paralelo, SIN bloquear la
+     entrada a la app — la persona no tiene que buscar el botón "Reenviar". */
+  sb.auth.signInWithOtp({ email, options:{ shouldCreateUser:false, emailRedirectTo: location.href.split('#')[0].split('?')[0] } }).catch(()=>{});
   window._pendingSuggestedBudget = suggestedBudgetFromAnswers();
   if (!data.session){
     errEl.style.color = 'var(--accent)';
@@ -5238,38 +5298,75 @@ function referralStatusMeta(r){
 }
 
 /* --- acreditación: respeta tope mensual y tope total, lo demás queda en cola --- */
-function markReferralCompleted(referralId){
-  const r = (userData.referrals||[]).find(x=>x.id===referralId);
-  if (!r || r.completed) return;
-  /* El servidor es quien valida esto de verdad (ver Edge Function en la
-     migración SQL): aquí solo evitamos pintar como completo a alguien que
-     todavía no verificó su correo. */
-  if (r.emailVerified === false) return;
-  r.completed = true;
-  r.completedAt = new Date().toISOString();
-  persistUserState();
-  pushNotif('medal', `${r.name} completó su Despegue`, 'Tu invitado ya usa RENTAPP de verdad', '🤝');
-  processReferralQueue();
-  checkMedalUnlocks();
+/* ==== FUENTE DE VERDAD: EL SERVIDOR ====
+   Las recompensas de referidos las decide y aplica Postgres (funciones +
+   trigger en supabase_migration.sql): marcar completed, verificar correo,
+   tope de 4/mes, cola FIFO y +3 días a trial_ends_at — todo del lado del
+   servidor, atómico con cada check-in. El navegador NO puede acreditarse
+   días: aquí solo LEEMOS public.referrals y user_settings para pintar la
+   UI. El JSON de user_settings.referrals queda como simple caché de lectura. */
+async function refreshReferralsFromServer(){
+  if (!currentUser) return false;
+  try{
+    const [{ data:rows, error:refErr }, { data:st }] = await Promise.all([
+      sb.from('referrals').select('*').eq('referrer_id', currentUser.id).order('created_at', { ascending:true }),
+      sb.from('user_settings').select('tier, trial_ends_at, referrals').eq('user_id', currentUser.id).maybeSingle()
+    ]);
+    if (refErr) return false;
+    const cache = (st && st.referrals) || userData.referrals || [];
+    const prevRewarded = (userData.referrals||[]).filter(r=>r.rewarded).length;
+    userData.referrals = (rows||[]).map(row=>{
+      const cached = cache.find(c=> c.id === row.id) || {};
+      return {
+        id: row.id,
+        name: row.referred_name || cached.name || 'Invitado',
+        emoji: cached.emoji || '👤',
+        streakDays: row.completed ? 7 : (cached.streakDays || 0),
+        completed: !!row.completed,
+        completedAt: row.completed_at || null,
+        rewarded: !!row.rewarded,
+        rewardMonth: row.reward_month || null,
+        rewardedAt: row.rewarded_at || null
+      };
+    });
+    if (st){
+      userData.tier = st.tier || userData.tier;
+      userData.trialEndsAt = st.trial_ends_at || userData.trialEndsAt;
+    }
+    const nowRewarded = userData.referrals.filter(r=>r.rewarded).length;
+    if (nowRewarded > prevRewarded){
+      const earned = (nowRewarded - prevRewarded) * REFERRAL_DAYS_PER_FRIEND;
+      pushNotif('medal', `+${earned} días de Premium`, 'Recompensa por invitar amigos', '🎁');
+    }
+    persistUserState(); /* guarda el caché de lectura para pintar rápido la próxima vez */
+    return true;
+  }catch(e){ return false; }
 }
-function processReferralQueue(){
-  const queue = (userData.referrals||[]).filter(r=>r.completed && !r.rewarded)
-    .sort((a,b)=> new Date(a.completedAt||0) - new Date(b.completedAt||0));
-  let credited = 0;
-  for (const r of queue){
-    if (referralSlotsLeft() <= 0) break;
-    if (referralDaysEarned() >= REFERRAL_MAX_TOTAL_DAYS) break;
-    r.rewarded = true;
-    r.rewardMonth = monthKeyNow();
-    r.rewardedAt = new Date().toISOString();
-    extendPremiumDays(REFERRAL_DAYS_PER_FRIEND);
-    credited++;
-  }
-  if (credited){
-    showToast(`🎁 +${credited*REFERRAL_DAYS_PER_FRIEND} días de Premium por tus invitados`);
-    pushNotif('medal', `+${credited*REFERRAL_DAYS_PER_FRIEND} días de Premium`, 'Recompensa por invitar amigos', '🎁');
-  }
-  return credited;
+
+/* ==== registro del referido (una sola vez, lo valida el servidor) ====
+   El código llega en la URL (?ref=RENTAPP-XXXXX). El RPC register_referral
+   corre con privilegios del servidor: valida el código, bloquea el
+   auto-referido y respeta unique(referred_id) — el cliente no puede
+   fabricar filas en public.referrals. */
+let _pendingRefCode = null;
+function captureReferralCodeFromUrl(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const code = p.get('ref') || (location.hash.match(/[#&]ref=([^&]+)/)||[])[1];
+    if (code) _pendingRefCode = decodeURIComponent(code).trim();
+  }catch(e){}
+}
+async function registerPendingReferral(){
+  if (!_pendingRefCode || !currentUser) return;
+  if (userData && userData.referredBy) { _pendingRefCode = null; return; }
+  try{
+    const { data, error } = await sb.rpc('register_referral', { p_code:_pendingRefCode });
+    if (!error && data === true){
+      userData.referredBy = _pendingRefCode;
+      showToast('🤝 Entraste con una invitación — ¡bienvenido!');
+    }
+  }catch(e){ /* código inválido o ya referido: silencioso */ }
+  _pendingRefCode = null;
 }
 function extendPremiumDays(days){
   const base = (userData.trialEndsAt && new Date(userData.trialEndsAt) > new Date())
@@ -5290,6 +5387,7 @@ function referredBonusEligible(){ return !!userData.referredBy && !userData.refe
 function claimReferredBonus(){
   if (!referredBonusEligible()) return;
   userData.referredBonusClaimed = true;
+  userData.everCountedAsReferralCompleted = true;
   extendPremiumDays(REFERRED_BONUS_DAYS);
   pushNotif('medal', `+${REFERRED_BONUS_DAYS} días extra de Premium`, 'Bono por entrar con una invitación', '🎁');
 }
@@ -5305,6 +5403,13 @@ function claimReferredStory(){
 
 function openReferralScreen(){
   ensureReferralCode();
+  if (!openReferralScreen._syncing){
+    openReferralScreen._syncing = true;
+    refreshReferralsFromServer().then(ok=>{
+      openReferralScreen._syncing = false;
+      if (ok && document.getElementById('recapModalOverlay').classList.contains('show')) openReferralScreen();
+    });
+  }
   const code = userData.referralCode;
   const refs = userData.referrals || [];
   const daysEarned = referralDaysEarned();
@@ -5407,9 +5512,15 @@ const LEVEL_TITLES = [
 ];
 
 function monthKeysWithData(){
+  // Solo meses CERRADOS: el mes calendario en curso se excluye porque un mes
+  // incompleto no puede evaluarse para medallas mensuales (budget/wants/needs/
+  // income/assign). Si al cierre no se cumplió, ese mes simplemente no suma.
+  // Esta función se usa ÚNICAMENTE en los measure() de medallas — el dashboard,
+  // reportes y stories calculan el mes en curso por su cuenta y no pasan por aquí.
+  const currentKey = todayStr().slice(0,7); // 'YYYY-MM' local (todayStr usa fecha local)
   const set = new Set();
   (userData.transactions||[]).forEach(t=> set.add(t.date.slice(0,7)));
-  return [...set].sort();
+  return [...set].sort().filter(k=> k < currentKey);
 }
 function monthStats(key){
   const y = parseInt(key.slice(0,4)), m = parseInt(key.slice(5,7));
@@ -6290,6 +6401,526 @@ function maybeAutoPremiumStory(){
 }
 
 /* ======================= MODAL HELPERS ======================= */
+/* ======================= MANEJO DE INFORMACIÓN DE CUENTA (reinicios / rollback) =======================
+   Regla central: el filtro es SIEMPRE por la FECHA asignada al registro, nunca por
+   cuándo se creó. Un gasto con fecha de julio registrado hoy sobrevive a un rollback
+   de 2 días aunque se haya escrito literalmente hoy.
+
+   Niveles (dependen del TAMAÑO de la ventana, no del botón):
+     1 — N días con N<30: solo borra registros con fecha en la ventana. Nada más, sin preguntas.
+     2 — N≥30, mes actual o año actual: igual que 1 + aviso condicional de presupuesto
+         (solo si se modificó dentro de la ventana) + mantener/eliminar por categoría
+         (atajos, tarjetas, deudas, recurrentes, metas — objeto completo).
+     3 — total: todo el historial + racha (checkins) + XP/medallas vistas a cero +
+         presupuesto nuevo obligatorio (prellenado) + mismas opciones por categoría.
+
+   Nunca se toca:
+     · checkins (la racha) en niveles 1-2 — y borrar registros nunca puede AGREGAR
+       días activos, así que un rollback jamás puede "reparar" una racha rota: queda
+       imposible por diseño.
+     · Cosméticos: no se eligen — se recalculan del nivel resultante; si el acabado
+       equipado deja de estar desbloqueado, cae al más alto disponible.
+     · Contadores de usos gratis (recaps, IA mensual): reiniciarlos permitiría
+       "recargar" los gratis borrando la cuenta — se conservan a propósito.
+     · Banderas anti-fraude persistentes (sobreviven incluso al reinicio total):
+       premiumGiftGranted, referredBonusClaimed, referredStoryClaimed,
+       everCountedAsReferralCompleted, referralCode, referredBy.
+       En producción, estas viven además del lado del servidor (ver notas de la
+       migración SQL) — ninguna opción de este sistema las limpia.
+
+   💡 Futuro (NO construido, solo considerado en el diseño): "protectores de racha"
+   acumulables por medallas. Este módulo no toca checkins en 1-2 y trata la racha
+   como derivada de datos — compatible con agregar protectores después sin refactor. */
+
+function stampBudgetUpdated(){ userData.budgetUpdatedAt = new Date().toISOString(); }
+
+const RESET_CFG_CATS = [
+  { id:'shortcuts', label:'Atajos',      emoji:'⚡', count:()=> ((userData.txShortcuts||[]).length + (userData.allocShortcuts||[]).length) },
+  { id:'cards',     label:'Tarjetas',    emoji:'💳', count:()=> (userData.cards||[]).length },
+  { id:'debts',     label:'Deudas',      emoji:'⚔️', count:()=> (userData.debts||[]).length },
+  { id:'recurring', label:'Recurrentes', emoji:'🔁', count:()=> (userData.recurringItems||[]).length },
+  { id:'goals',     label:'Metas',       emoji:'🏆', count:()=> (userData.goals||[]).length }
+];
+
+let _rst = null;        // estado del flujo en curso
+let _rstTimerInt = null; // intervalo del timer de confirmación
+
+function resetWindowStart(mode, nDays){
+  const t = todayStr();
+  if (mode === 'days'){
+    const d = new Date();
+    d.setDate(d.getDate() - (Math.max(1, nDays) - 1)); // incluye hoy
+    return isoDate(d);
+  }
+  if (mode === 'month') return t.slice(0,7) + '-01';
+  if (mode === 'year')  return t.slice(0,4) + '-01-01';
+  return null; // total: sin ventana, todo
+}
+function resetLevel(mode, nDays){
+  if (mode === 'total') return 3;
+  if (mode === 'days')  return nDays >= 30 ? 2 : 1;
+  return 2; // mes y año son ventanas largas por definición
+}
+function inResetWindow(dateStr, start){ return start === null || dateStr >= start; }
+
+/* Cuenta (sin borrar) lo que caería dentro de la ventana — para el resumen y el respaldo */
+function collectResetImpact(start){
+  const del = { transactions:[], goalDeposits:[], debtPayments:[], investmentDeposits:[], savingsDeposits:[] };
+  (userData.transactions||[]).forEach(t=>{ if (inResetWindow(t.date, start)) del.transactions.push(t); });
+  (userData.goals||[]).forEach(g=> (g.deposits||[]).forEach(d=>{ if (inResetWindow(d.date, start)) del.goalDeposits.push({ meta:g.name, ...d }); }));
+  (userData.debts||[]).forEach(dd=> (dd.payments||[]).forEach(p=>{ if (inResetWindow(p.date, start)) del.debtPayments.push({ deuda:dd.name, ...p }); }));
+  (userData.investments||[]).forEach(i=> (i.deposits||[]).forEach(d=>{ if (inResetWindow(d.date, start)) del.investmentDeposits.push({ inversion:i.name, ...d }); }));
+  (((userData.generalSavings||{}).deposits)||[]).forEach(d=>{ if (inResetWindow(d.date, start)) del.savingsDeposits.push(d); });
+  return del;
+}
+
+function budgetTouchedInWindow(start){
+  if (start === null) return true;
+  if (!userData.budgetUpdatedAt) return false;
+  return userData.budgetUpdatedAt.slice(0,10) >= start;
+}
+
+/* Aplica el reinicio sobre el userData GLOBAL (se usa igual sobre un clon para proyectar) */
+function applyResetToUserData(mode, nDays, opts){
+  opts = opts || {};
+  const start = resetWindowStart(mode, nDays);
+  const lvl = resetLevel(mode, nDays);
+
+  // 1) Borrado por FECHA del registro (regla central)
+  userData.transactions = (userData.transactions||[]).filter(t=> !inResetWindow(t.date, start));
+  (userData.goals||[]).forEach(g=>{
+    g.deposits = (g.deposits||[]).filter(d=> !inResetWindow(d.date, start));
+    const saved = g.deposits.reduce((a,d)=>a+d.amount,0);
+    if (g.done && saved < g.target) g.done = false; // una meta "cumplida" cuyos aportes se revirtieron deja de contar
+  });
+  (userData.debts||[]).forEach(dd=>{
+    dd.payments = (dd.payments||[]).filter(p=> !inResetWindow(p.date, start));
+    const paid = dd.payments.reduce((a,p)=>a+p.amount,0);
+    if (dd.done && paid < dd.target) dd.done = false;
+  });
+  (userData.investments||[]).forEach(i=>{ i.deposits = (i.deposits||[]).filter(d=> !inResetWindow(d.date, start)); });
+  userData.generalSavings = userData.generalSavings || { deposits:[] };
+  userData.generalSavings.deposits = (userData.generalSavings.deposits||[]).filter(d=> !inResetWindow(d.date, start));
+  userData.goalsAchievedLog = (userData.goalsAchievedLog||[]).filter(e=> !e.date || !inResetWindow(e.date, start));
+
+  // 2) Configuración elegible por categoría (solo niveles 2 y 3) — borra el objeto COMPLETO
+  if (lvl >= 2 && opts.remove){
+    if (opts.remove.shortcuts){ userData.txShortcuts = []; userData.allocShortcuts = []; }
+    if (opts.remove.cards)     userData.cards = [];
+    if (opts.remove.debts)     userData.debts = [];
+    if (opts.remove.recurring){ userData.recurringItems = []; userData.snoozed = {}; }
+    if (opts.remove.goals)     userData.goals = [];
+  }
+
+  // 3) Solo el reinicio TOTAL toca racha, XP y medallas vistas
+  if (lvl === 3){
+    userData.checkins = [];        // la racha se pierde ÚNICAMENTE aquí
+    userData.xpBonus = 0;          // XP sin fecha (atajos, verificación, referidos cobrados) solo se pierde en total
+    userData.medalsSeen = [];
+    userData.storiesSeen = [];
+    userData.notifs = [];
+    userData.goalsAchievedLog = [];
+    if (opts.newBudget && opts.newBudget.length){
+      userData.budget = opts.newBudget.map(b=>({ ...b }));
+      stampBudgetUpdated();
+    }
+  }
+
+  // 4) Cosméticos: nunca se eligen — se normalizan según el nivel resultante
+  if (userData.equippedSkin){
+    const still = unlockedSkins().some(t=> t.id === userData.equippedSkin);
+    if (!still) userData.equippedSkin = null; // currentSkin() cae solo al más alto desbloqueado
+  }
+  // 5) Banderas anti-fraude: NO se tocan en ningún nivel (por diseño, no hay código que las limpie aquí)
+}
+
+/* Proyección segura: clona, aplica sobre el clon, mide, restaura */
+function projectAfterReset(mode, nDays, opts){
+  const real = userData;
+  try {
+    userData = JSON.parse(JSON.stringify(real));
+    applyResetToUserData(mode, nDays, opts);
+    const L = userLevel();
+    return { level: L.level, title: L.title, medals: allMedalStates().filter(s=>s.level>0).length };
+  } finally {
+    userData = real;
+  }
+}
+
+/* ---------- UI: menú principal ---------- */
+function openAccountMgmt(){
+  _rst = null;
+  document.getElementById('acctModalBody').innerHTML = `
+    <div class="modal-title">Manejo de información de cuenta</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.55;margin-bottom:14px">
+      Reinicia parte o toda tu información. Lo que se borra o se conserva depende de la
+      <b>fecha</b> de cada registro, no de cuándo lo escribiste.
+    </div>
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">↩️ Reiniciar los últimos N días</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="rstNDays" min="1" max="3650" value="2" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:15px">
+        <button class="btn small" style="width:auto;padding:10px 16px" onclick="startReset('days')">Continuar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Borra los registros cuya fecha caiga en esos días (incluye hoy).</div>
+    </div>
+    <div class="more-item" onclick="startReset('month')">
+      <div class="more-ic">🗓️</div>
+      <div class="more-info"><div class="more-name">Reiniciar el mes actual</div><div class="more-sub">Desde el día 1 de este mes; el mes pasado queda intacto</div></div>
+      <div class="more-chev">›</div>
+    </div>
+    <div class="more-item" onclick="startReset('year')">
+      <div class="more-ic">📅</div>
+      <div class="more-info"><div class="more-name">Reiniciar el año actual</div><div class="more-sub">Desde el 1 de enero; años anteriores quedan intactos</div></div>
+      <div class="more-chev">›</div>
+    </div>
+    <div class="more-item" onclick="startReset('total')">
+      <div class="more-ic">🧨</div>
+      <div class="more-info"><div class="more-name" style="color:var(--red)">Reiniciar toda la cuenta</div><div class="more-sub">Borra todo, incluida la racha — como empezar de cero</div></div>
+      <div class="more-chev">›</div>
+    </div>
+    <button class="btn ghost" style="margin-top:10px" onclick="closeAcctModal()">Cerrar</button>
+  `;
+  openModal('acctModalOverlay');
+}
+function closeAcctModal(){
+  if (_rstTimerInt){ clearInterval(_rstTimerInt); _rstTimerInt = null; }
+  _rst = null;
+  closeModal('acctModalOverlay');
+}
+
+function startReset(mode){
+  let nDays = 0;
+  if (mode === 'days'){
+    const inp = document.getElementById('rstNDays');
+    nDays = parseInt(inp && inp.value, 10);
+    if (!nDays || nDays < 1){ showToast('Elige cuántos días quieres reiniciar'); return; }
+  }
+  const lvl = resetLevel(mode, nDays);
+  _rst = {
+    mode, nDays, lvl,
+    start: resetWindowStart(mode, nDays),
+    remove: { shortcuts:false, cards:false, debts:false, recurring:false, goals:false },
+    newBudget: (userData.budget||[]).map(b=>({ ...b })) // prellenado como referencia (solo nivel 3)
+  };
+  renderResetSummary();
+}
+
+/* ---------- Capa 1: resumen concreto + respaldo + opciones ---------- */
+function renderResetSummary(){
+  const r = _rst;
+  const impact = collectResetImpact(r.start);
+  r.impact = impact;
+  const cur = userLevel();
+  const curMedals = allMedalStates().filter(s=>s.level>0).length;
+  const streak = computeStreak();
+
+  const labels = {
+    days:  `los últimos ${r.nDays} días (desde ${r.start})`,
+    month: `el mes actual (desde ${r.start})`,
+    year:  `el año actual (desde ${r.start})`,
+    total: 'toda la cuenta'
+  };
+  const counts = [
+    [impact.transactions.length, 'movimientos'],
+    [impact.goalDeposits.length, 'aportes a metas'],
+    [impact.debtPayments.length, 'pagos de deudas'],
+    [impact.investmentDeposits.length, 'depósitos de inversión'],
+    [impact.savingsDeposits.length, 'depósitos de ahorro general']
+  ].filter(c=>c[0]>0);
+
+  const budgetNotice = (r.lvl === 2 && budgetTouchedInWindow(r.start)) ? `
+    <div class="card" style="padding:11px 13px;margin-bottom:10px;border:1px solid var(--amber)">
+      <div style="font-size:12.5px;line-height:1.5"><b style="color:var(--amber)">⚠️ Verifica tu presupuesto.</b>
+      Lo modificaste dentro de este período. El reinicio no lo cambia por ti, pero puede que los
+      porcentajes actuales ya no reflejen lo que quieres — revísalo al terminar.</div>
+    </div>` : '';
+
+  const cfgToggles = r.lvl >= 2 ? `
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:4px">Tu configuración — tú decides</div>
+      <div style="font-size:11.5px;color:var(--text3);line-height:1.5;margin-bottom:9px">
+        Cada categoría se puede <b>mantener</b> o <b>eliminar por completo</b> (el objeto entero,
+        no solo su historial). Son independientes entre sí.
+      </div>
+      ${RESET_CFG_CATS.map(c=>`
+        <div class="row-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px">${c.emoji} ${c.label} <span style="color:var(--text3);font-size:11px">(${c.count()})</span></span>
+          <div class="seg" style="margin:0">
+            <button id="rstKeep-${c.id}" class="${!r.remove[c.id]?'active neutral':''}" style="font-size:11px;padding:5px 10px" onclick="rstToggleCat('${c.id}', false)">Mantener</button>
+            <button id="rstDel-${c.id}" class="${r.remove[c.id]?'active neutral':''}" style="font-size:11px;padding:5px 10px" onclick="rstToggleCat('${c.id}', true)">Eliminar</button>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  const budgetEditor = r.lvl === 3 ? `
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:4px">Presupuesto nuevo</div>
+      <div style="font-size:11.5px;color:var(--text3);line-height:1.5;margin-bottom:9px">
+        Al empezar de cero necesitas un presupuesto. Te dejamos los porcentajes anteriores
+        como referencia — ajústalos o déjalos tal cual.
+      </div>
+      ${r.newBudget.map((b,i)=>`
+        <div class="bslider-row">
+          <div class="bslider-head"><span><span class="swatch" style="background:${b.color||'var(--accent)'}"></span>${b.name}</span><span id="rstpct-${i}">${b.pct}%</span></div>
+          <input type="range" id="rstrange-${i}" min="0" max="100" value="${b.pct}" oninput="onResetBudgetSlide(${i}, this.value)">
+        </div>`).join('')}
+      <div class="row-between"><span style="font-size:12px;color:var(--text3)">Total</span><b id="rstBudgetTotal">${r.newBudget.reduce((a,b)=>a+b.pct,0)}%</b></div>
+    </div>` : '';
+
+  const xpNote = r.lvl < 3 ? `
+    <div style="font-size:11.5px;color:var(--text3);line-height:1.5;margin-bottom:10px">
+      ℹ️ Tus medallas y XP se recalculan solos con lo que quede. Ojo: <b>tu nivel general puede no
+      bajar tanto como esperas</b> — parte de tu progreso (atajos creados, correo verificado,
+      recompensas de referidos) no está atado a fechas y se conserva.
+    </div>` : `
+    <div style="font-size:11.5px;color:var(--text3);line-height:1.5;margin-bottom:10px">
+      ℹ️ El reinicio total también pone en cero el progreso que no depende de fechas (XP de
+      atajos, medallas vistas). Tus beneficios ya cobrados (regalo de Despegue, bonos de
+      referido) no se pueden volver a cobrar — eso queda registrado de forma permanente.
+    </div>`;
+
+  document.getElementById('acctModalBody').innerHTML = `
+    <div class="modal-title">Vas a reiniciar ${labels[r.mode]}</div>
+    <div class="card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:6px">Esto es exactamente lo que se pierde:</div>
+      ${counts.length ? counts.map(c=>`<div style="font-size:13px;padding:3px 0">• <b>${c[0]}</b> ${c[1]}</div>`).join('') : '<div style="font-size:12.5px;color:var(--text3)">Ningún movimiento cae en este período.</div>'}
+      <div style="font-size:13px;padding:3px 0">• Racha actual (${streak} días): ${r.lvl===3 ? '<b style="color:var(--red)">se pierde</b>' : '<b style="color:var(--accent)">no se toca</b>'}</div>
+      <div style="font-size:13px;padding:3px 0">• Nivel: ${cur.level} (${curMedals} medallas) → <b id="rstProjection">…</b></div>
+    </div>
+    ${xpNote}
+    ${budgetNotice}
+    ${cfgToggles}
+    ${budgetEditor}
+    <div class="card" style="padding:11px 13px;margin-bottom:12px">
+      <div style="font-size:12px;line-height:1.5;margin-bottom:8px">💾 Si quieres, descarga una copia de lo que se va a borrar antes de continuar. Es opcional.</div>
+      <button class="btn small ghost" style="width:auto;padding:8px 14px" onclick="downloadResetBackup()">Descargar respaldo (.json)</button>
+    </div>
+    <button class="btn" style="background:var(--red);margin-bottom:8px" onclick="renderResetFinalConfirm()">Continuar</button>
+    <button class="btn ghost" onclick="openAccountMgmt()">← Volver</button>
+  `;
+  openModal('acctModalOverlay');
+  rstUpdateProjection();
+}
+function rstToggleCat(id, remove){
+  _rst.remove[id] = remove;
+  const k = document.getElementById('rstKeep-'+id), d = document.getElementById('rstDel-'+id);
+  if (k) k.className = !remove ? 'active neutral' : '';
+  if (d) d.className = remove ? 'active neutral' : '';
+  rstUpdateProjection();
+}
+function rstUpdateProjection(){
+  const el = document.getElementById('rstProjection');
+  if (!el || !_rst) return;
+  const p = projectAfterReset(_rst.mode, _rst.nDays, { remove:_rst.remove, newBudget:_rst.newBudget });
+  el.textContent = `quedarías en nivel ${p.level} (${p.medals} medallas)`;
+}
+/* Sliders del presupuesto nuevo (nivel 3): actualizan SOLO su propio elemento —
+   nunca re-renderizan la lista completa (lección aprendida del modal de presupuesto) */
+function onResetBudgetSlide(i, val){
+  val = Math.max(0, Math.min(100, parseInt(val)));
+  const budget = _rst.newBudget;
+  const old = budget[i].pct;
+  let delta = val - old;
+  if (delta === 0) return;
+  const others = budget.map((b,idx)=>idx).filter(idx=>idx!==i);
+  const othersTotal = others.reduce((a,idx)=>a+budget[idx].pct,0);
+  if (delta > 0){
+    const taken = Math.min(delta, othersTotal);
+    budget[i].pct = old + taken;
+    let distributed = 0;
+    others.forEach((idx,k)=>{
+      const share = othersTotal>0 ? budget[idx].pct/othersTotal : 1/others.length;
+      let cut = k===others.length-1 ? (taken-distributed) : Math.round(taken*share);
+      cut = Math.min(cut, budget[idx].pct);
+      budget[idx].pct -= cut; distributed += cut;
+    });
+  } else {
+    budget[i].pct = val;
+    const toGive = -delta;
+    let distributed = 0;
+    others.forEach((idx,k)=>{
+      const share = othersTotal>0 ? budget[idx].pct/othersTotal : 1/others.length;
+      const add = k===others.length-1 ? (toGive-distributed) : Math.round(toGive*share);
+      budget[idx].pct += add; distributed += add;
+    });
+  }
+  let total = budget.reduce((a,b)=>a+b.pct,0);
+  let diff = 100 - total;
+  if (diff !== 0 && others.length){
+    const idxToFix = others.reduce((best,idx)=> budget[idx].pct>budget[best].pct?idx:best, others[0]);
+    budget[idxToFix].pct = Math.max(0, budget[idxToFix].pct + diff);
+  }
+  budget.forEach((b,idx)=>{
+    const label = document.getElementById('rstpct-'+idx);
+    if (label) label.textContent = b.pct+'%';
+    const slider = document.getElementById('rstrange-'+idx);
+    if (slider) slider.value = b.pct;
+  });
+  const totalEl = document.getElementById('rstBudgetTotal');
+  if (totalEl) totalEl.textContent = budget.reduce((a,b)=>a+b.pct,0)+'%';
+}
+
+function downloadResetBackup(){
+  if (!_rst) return;
+  const payload = {
+    exportadoEl: new Date().toISOString(),
+    reinicio: { tipo:_rst.mode, dias:_rst.nDays||null, desde:_rst.start||'todo' },
+    datosQueSeBorran: _rst.impact || collectResetImpact(_rst.start)
+  };
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    if (typeof URL === 'undefined' || !URL.createObjectURL){ showToast('Tu navegador no permite descargas directas'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'rentapp-respaldo-' + todayStr() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 3000);
+    showToast('Respaldo descargado 💾');
+  } catch(e){ showToast('No se pudo generar el respaldo'); }
+}
+
+/* ---------- Capa 2 (final): advertencia + timer de 10 s que BLOQUEA el botón ---------- */
+function renderResetFinalConfirm(){
+  const r = _rst;
+  if (!r) return;
+  const medalWarn = r.lvl === 3
+    ? 'Perderás <b>todas</b> tus medallas, tu nivel, tu racha y los logros obtenidos.'
+    : 'Las medallas y logros que dependan del período borrado <b>bajarán o se perderán</b> al recalcularse.';
+  document.getElementById('acctModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="font-size:36px">⚠️</div>
+      <div class="modal-title" style="margin-bottom:4px">Última confirmación</div>
+    </div>
+    <div class="card" style="padding:13px 15px;margin-bottom:12px;border:1px solid var(--red)">
+      <div style="font-size:13px;line-height:1.6">
+        ${medalWarn} Esta acción <b>no se puede deshacer</b>.
+      </div>
+    </div>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.55;margin-bottom:14px;cursor:pointer">
+      <input type="checkbox" id="rstPhraseChk" onchange="rstMaybeEnableFinal()" style="margin-top:2px;width:17px;height:17px;flex-shrink:0">
+      <span><b>Estoy completamente seguro que quiero borrar toda la información correspondiente al periodo elegido.</b></span>
+    </label>
+    <button class="btn" id="rstFinalBtn" disabled style="background:var(--red);opacity:.5;margin-bottom:8px" onclick="executeReset()">Espera 10 s…</button>
+    <button class="btn ghost" onclick="renderResetSummary()">← Volver</button>
+  `;
+  // Timer real: el botón queda deshabilitado hasta llegar a 0 — no es decorativo
+  r.timerLeft = 10;
+  if (_rstTimerInt) clearInterval(_rstTimerInt);
+  _rstTimerInt = setInterval(()=>{
+    r.timerLeft--;
+    const btn = document.getElementById('rstFinalBtn');
+    if (!btn){ clearInterval(_rstTimerInt); _rstTimerInt = null; return; }
+    if (r.timerLeft > 0){
+      btn.textContent = 'Espera ' + r.timerLeft + ' s…';
+    } else {
+      clearInterval(_rstTimerInt); _rstTimerInt = null;
+      r.timerDone = true;
+      btn.textContent = 'Sí, borrar definitivamente';
+      rstMaybeEnableFinal();
+    }
+  }, 1000);
+}
+function rstMaybeEnableFinal(){
+  const btn = document.getElementById('rstFinalBtn');
+  const chk = document.getElementById('rstPhraseChk');
+  if (!btn || !_rst) return;
+  const ok = _rst.timerDone && chk && chk.checked;
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '.5';
+}
+
+/* PRODUCCIÓN: primero se borra en el SERVIDOR por ventana de fecha, y después
+   se recarga la verdad desde Supabase — así no puede quedar un estado a medias
+   entre el navegador y la base. Las banderas anti-fraude de verdad viven en
+   account_permanent_flags (solo-lectura para el cliente): ninguna de estas
+   operaciones puede tocarlas. */
+async function persistResetRemote(r){
+  const start = r.start === null ? '0001-01-01' : r.start; // total = desde siempre
+  const uid = currentUser.id;
+  const jobs = [
+    sb.from('transactions').delete().eq('user_id', uid).gte('date', start),
+    sb.from('goal_deposits').delete().eq('user_id', uid).gte('date', start),
+    sb.from('debt_payments').delete().eq('user_id', uid).gte('date', start),
+    sb.from('investment_deposits').delete().eq('user_id', uid).gte('date', start),
+    sb.from('general_savings').delete().eq('user_id', uid).gte('date', start)
+  ];
+  const results = await Promise.all(jobs);
+  const failed = results.find(x=> x && x.error);
+  if (failed) throw failed.error;
+
+  /* metas/deudas marcadas como cumplidas cuyos aportes se revirtieron: quitar el done */
+  const undoneUpdates = [];
+  (userData.goals||[]).forEach(g=>{
+    if (!g.done) return;
+    const remaining = (g.deposits||[]).filter(d=> !inResetWindow(d.date, r.start)).reduce((a,d)=>a+d.amount,0);
+    if (remaining < g.target) undoneUpdates.push(sb.from('goals').update({ done:false }).eq('id', g.id).eq('user_id', uid));
+  });
+  (userData.debts||[]).forEach(dd=>{
+    if (!dd.done) return;
+    const remaining = (dd.payments||[]).filter(p=> !inResetWindow(p.date, r.start)).reduce((a,p)=>a+p.amount,0);
+    if (remaining < dd.target) undoneUpdates.push(sb.from('debts').update({ done:false }).eq('id', dd.id).eq('user_id', uid));
+  });
+  if (undoneUpdates.length) await Promise.all(undoneUpdates);
+
+  /* niveles 2 y 3: eliminación completa por categoría elegida */
+  if (r.lvl >= 2){
+    const rmJobs = [];
+    if (r.remove.debts)     rmJobs.push(sb.from('debts').delete().eq('user_id', uid));
+    if (r.remove.goals)     rmJobs.push(sb.from('goals').delete().eq('user_id', uid));
+    if (r.remove.cards)     rmJobs.push(sb.from('cards').delete().eq('user_id', uid));
+    if (r.remove.recurring){
+      rmJobs.push(sb.from('recur_snoozed').delete().eq('user_id', uid));
+      rmJobs.push(sb.from('recurring_items').delete().eq('user_id', uid));
+    }
+    if (rmJobs.length){
+      const rmRes = await Promise.all(rmJobs);
+      const rmFail = rmRes.find(x=> x && x.error);
+      if (rmFail) throw rmFail.error;
+    }
+    if (r.remove.shortcuts) await sb.from('user_settings').update({ alloc_shortcuts:[], tx_shortcuts:[] }).eq('user_id', uid);
+  }
+
+  /* nivel 3: racha, XP, medallas vistas y presupuesto nuevo */
+  if (r.lvl === 3){
+    const { error:ckErr } = await sb.from('daily_checkins').delete().eq('user_id', uid).gte('date', '0001-01-01');
+    if (ckErr) throw ckErr;
+    const nowIso = new Date().toISOString();
+    const { error:stErr } = await sb.from('user_settings').update({
+      xp_bonus: 0, medals_seen: [], stories_seen: [], notifs: [],
+      budget: r.newBudget.map(b=>({ ...b })), budget_updated_at: nowIso, budget_customized: true
+    }).eq('user_id', uid);
+    if (stErr) throw stErr;
+  }
+}
+
+async function executeReset(){
+  const r = _rst;
+  if (!r || !r.timerDone) return;
+  const chk = document.getElementById('rstPhraseChk');
+  if (!chk || !chk.checked) return;
+  const btn = document.getElementById('rstFinalBtn');
+  if (btn){ btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  try{
+    await persistResetRemote(r);
+    userData = await loadAllUserData();   // la verdad del servidor, sin estados a medias
+  }catch(e){
+    if (btn){ btn.disabled = false; btn.textContent = 'Sí, borrar definitivamente'; }
+    showToast('No se pudo completar el reinicio — revisa tu conexión e inténtalo de nuevo');
+    return;
+  }
+  /* cosméticos: normalizar con el nivel resultante */
+  if (userData.equippedSkin && !unlockedSkins().some(t=> t.id === userData.equippedSkin)){
+    userData.equippedSkin = null;
+    persistSetting({ equipped_skin: null });
+  }
+  persistUserState();
+  closeAcctModal();
+  if (typeof destroyCharts === 'function') destroyCharts();
+  goTab('home');
+  showToast(r.mode === 'total' ? 'Cuenta reiniciada — empezamos de cero 🌱' : 'Reinicio aplicado ✅');
+}
+
 function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 
@@ -6308,6 +6939,7 @@ function _confirmModalResolve(val){
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
+  captureReferralCodeFromUrl();
   document.querySelectorAll('.modal-overlay').forEach(ov=>{
     ov.addEventListener('click', (e)=>{ if (e.target === ov) ov.classList.remove('show'); });
   });
